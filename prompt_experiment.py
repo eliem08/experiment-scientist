@@ -12,6 +12,26 @@ DEFAULT_EXPERIMENT = [
  {"id":"concise-01","baseline":"Explain what an API is.","treatment":"Explain what an API is in at most three sentences."}
 ]
 
+def bootstrap_mean_ci(values, iterations=5000, seed=17, confidence=0.95):
+    """Percentile bootstrap interval for a mean; intended as a descriptive aid."""
+    values = [float(v) for v in values]
+    if not values:
+        return {"mean": None, "lower": None, "upper": None, "n": 0}
+    mean = sum(values) / len(values)
+    if len(values) == 1:
+        return {"mean": mean, "lower": None, "upper": None, "n": 1}
+    rng = random.Random(seed)
+    means = []
+    for _ in range(iterations):
+        sample = [rng.choice(values) for _ in values]
+        means.append(sum(sample) / len(sample))
+    means.sort()
+    alpha = 1.0 - confidence
+    lo = max(0, min(len(means) - 1, int((alpha / 2) * len(means))))
+    hi = max(0, min(len(means) - 1, int((1 - alpha / 2) * len(means)) - 1))
+    return {"mean": mean, "lower": means[lo], "upper": means[hi], "n": len(values),
+            "confidence": confidence, "method": "percentile bootstrap; exploratory with small samples"}
+
 def run(model_id="distilgpt2", output="outputs/experiment", device="auto", max_new_tokens=120, seed=17):
     device=device if device!="auto" else ("cuda" if torch.cuda.is_available() else "mps" if getattr(torch.backends,"mps",None) and torch.backends.mps.is_available() else "cpu")
     random.seed(seed);torch.manual_seed(seed)
@@ -27,7 +47,8 @@ def run(model_id="distilgpt2", output="outputs/experiment", device="auto", max_n
             pair[arm]={"prompt":prompt,"response":response,"characters":len(response),"words":len(response.split()),"sha256":hashlib.sha256(response.encode()).hexdigest()}
         rows.append({"id":case["id"],**pair,"word_delta_treatment_minus_baseline":pair["treatment"]["words"]-pair["baseline"]["words"]})
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
-    payload={"model_id":model_id,"device":device,"seed":seed,"generation":{"do_sample":False,"max_new_tokens":max_new_tokens},"manifest":build_manifest("experiment-scientist",model_id=model_id,device=device,seed=seed,config={"do_sample":False,"max_new_tokens":max_new_tokens}),"note":"Small illustrative paired experiment; results are descriptive and not causal evidence.","results":rows}
+    deltas=[r["word_delta_treatment_minus_baseline"] for r in rows]
+    payload={"model_id":model_id,"device":device,"seed":seed,"generation":{"do_sample":False,"max_new_tokens":max_new_tokens},"bootstrap_word_delta":bootstrap_mean_ci(deltas,seed=seed),"manifest":build_manifest("experiment-scientist",model_id=model_id,device=device,seed=seed,config={"do_sample":False,"max_new_tokens":max_new_tokens}),"note":"Small illustrative paired experiment; results are descriptive and not causal evidence. Bootstrap intervals from tiny prompt sets are highly uncertain.","results":rows}
     (out/"experiment.json").write_text(json.dumps(payload,indent=2,ensure_ascii=False),encoding="utf-8")
     with (out/"experiment.csv").open("w",newline="",encoding="utf-8") as f:
         fields=["id","baseline_prompt","baseline_response","baseline_words","treatment_prompt","treatment_response","treatment_words","word_delta_treatment_minus_baseline"]
