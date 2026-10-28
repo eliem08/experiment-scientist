@@ -20,7 +20,7 @@ A reproducible experiment manager for LLM prompt and model research: define hypo
 - [ ] Move cases and hypotheses to a validated experiment-spec YAML/JSON file.
 - [ ] Add explicit outcome functions rather than relying only on word count.
 - [ ] Store exact model/tokenizer revision, prompt hashes, generation config and package versions.
-- [ ] Add repeated seeds and paired bootstrap confidence intervals.
+- [x] Add a deterministic percentile-bootstrap interval for word-count deltas (clearly marked exploratory for the current tiny sample).\n- [ ] Add repeated seeds and stronger paired uncertainty analysis.
 - [ ] Add a results report that distinguishes exploratory from pre-registered analysis.
 
 ### Phase 2 — Research workflow
