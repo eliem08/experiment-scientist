@@ -4,6 +4,7 @@ import argparse, csv, json, random, hashlib
 from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from provenance import build_manifest
 
 DEFAULT_EXPERIMENT = [
  {"id":"explain-01","baseline":"Explain photosynthesis in one paragraph.","treatment":"Explain photosynthesis in one paragraph, using a numbered sequence."},
@@ -26,7 +27,7 @@ def run(model_id="distilgpt2", output="outputs/experiment", device="auto", max_n
             pair[arm]={"prompt":prompt,"response":response,"characters":len(response),"words":len(response.split()),"sha256":hashlib.sha256(response.encode()).hexdigest()}
         rows.append({"id":case["id"],**pair,"word_delta_treatment_minus_baseline":pair["treatment"]["words"]-pair["baseline"]["words"]})
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
-    payload={"model_id":model_id,"device":device,"seed":seed,"generation":{"do_sample":False,"max_new_tokens":max_new_tokens},"note":"Small illustrative paired experiment; results are descriptive and not causal evidence.","results":rows}
+    payload={"model_id":model_id,"device":device,"seed":seed,"generation":{"do_sample":False,"max_new_tokens":max_new_tokens},"manifest":build_manifest("experiment-scientist",model_id=model_id,device=device,seed=seed,config={"do_sample":False,"max_new_tokens":max_new_tokens}),"note":"Small illustrative paired experiment; results are descriptive and not causal evidence.","results":rows}
     (out/"experiment.json").write_text(json.dumps(payload,indent=2,ensure_ascii=False),encoding="utf-8")
     with (out/"experiment.csv").open("w",newline="",encoding="utf-8") as f:
         fields=["id","baseline_prompt","baseline_response","baseline_words","treatment_prompt","treatment_response","treatment_words","word_delta_treatment_minus_baseline"]
