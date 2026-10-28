@@ -4,22 +4,20 @@
 
 A paired-prompt experiment runner that compares baseline and treatment instructions with fixed greedy decoding.
 
-## Run an experiment
+## Interactive dashboard
 
     pip install -r requirements.txt
-    python prompt_experiment.py --model-id distilgpt2
+    streamlit run dashboard.py
 
-Writes outputs/experiment/experiment.json and .csv, with both prompts and responses, word counts, hashes, and treatment-minus-baseline word deltas.
+Launch a paired experiment and compare word counts and individual baseline/treatment responses.
 
-    python prompt_experiment.py --model-id distilgpt2 --device cuda --seed 17
+## Run an experiment
 
-The built-in examples are demonstrations, not a pre-registered study. Before drawing conclusions, define hypotheses and outcomes in advance, use enough diverse prompts, track model/tokenizer versions, and test across multiple seeds or sampling settings where relevant.
+    python prompt_experiment.py --model-id distilgpt2 --device auto --seed 17
 
-## Quickstart
+Writes JSON and CSV with prompts, responses, word counts, hashes, and treatment-minus-baseline word deltas.
 
-    python main.py
-
-The original demo uses random weights to test the pipeline; use a pretrained model for useful experiments.
+The built-in examples are demonstrations, not a pre-registered study. Define hypotheses and outcomes in advance, use enough diverse prompts, track model/tokenizer versions, and test across multiple seeds or sampling settings where relevant.
 
 ## License
 
