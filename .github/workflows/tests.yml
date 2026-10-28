@@ -17,9 +17,7 @@ jobs:
           cache-dependency-path: requirements.txt
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt
-      - name: Compile application and dashboard modules
-        run: python -m py_compile runtime.py app.py main.py dashboard.py
-      - name: Compile research workflows
-        run: python -m py_compile activation_report.py benchmark.py probe_eval.py prompt_experiment.py activation_steering.py attention_lab.py
+      - name: Compile Python sources
+        run: python -m py_compile *.py tests/*.py
       - name: Run tests
         run: python -m pytest -q
