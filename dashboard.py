@@ -15,6 +15,9 @@ if st.button("Run paired experiment",type="primary"):
     st.metric("Prompt pairs",summary["pairs"])
     st.metric("Mean word-count delta",f"{summary['mean_word_delta']:+.2f}")
     payload=__import__("json").loads(open("outputs/experiment/experiment.json",encoding="utf-8").read())
+    ci=payload.get("bootstrap_word_delta", {})
+    if ci.get("lower") is not None:
+        st.caption(f"Exploratory 95% bootstrap interval for mean word-count delta: [{ci['lower']:.2f}, {ci['upper']:.2f}] (small sample; interpret cautiously).")
     rows=[]
     for r in payload["results"]:
         rows.append({"id":r["id"],"baseline_words":r["baseline"]["words"],"treatment_words":r["treatment"]["words"],"delta":r["word_delta_treatment_minus_baseline"]})
