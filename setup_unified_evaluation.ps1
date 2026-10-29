@@ -8,7 +8,9 @@ $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Parent = Split-Path -Parent $Root
 $Repositories = @(
     @{ Name = "behavior-bench"; Url = "https://github.com/eliem08/behavior-bench.git"; Path = (Join-Path $Parent "behavior-bench") },
-    @{ Name = "safety-probe-lab"; Url = "https://github.com/eliem08/safety-probe-lab.git"; Path = (Join-Path $Parent "safety-probe-lab") }
+    @{ Name = "safety-probe-lab"; Url = "https://github.com/eliem08/safety-probe-lab.git"; Path = (Join-Path $Parent "safety-probe-lab") },
+    @{ Name = "steering-studio"; Url = "https://github.com/eliem08/steering-studio.git"; Path = (Join-Path $Parent "steering-studio") },
+    @{ Name = "neural-flight-school"; Url = "https://github.com/eliem08/neural-flight-school.git"; Path = (Join-Path $Parent "neural-flight-school") }
 )
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -52,4 +54,5 @@ if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
 
 Write-Host ""
 Write-Host "Setup complete."
-Write-Host "Next: .\.venv\Scripts\python.exe unified_evaluation.py --model-id distilgpt2 --device cpu"
+Write-Host "Core workflow: .\.venv\Scripts\python.exe unified_evaluation.py --model-id distilgpt2 --device cpu"
+Write-Host "Five-tool workflow: .\.venv\Scripts\python.exe unified_evaluation.py --model-id gpt2 --device cpu --steering-studio-dir ..\steering-studio --neural-flight-school-dir ..\neural-flight-school"
