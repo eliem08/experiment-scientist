@@ -235,12 +235,9 @@ def run_workflow(
             )
             stage["exit_code"] = completed.returncode
             stage["duration_seconds"] = round(time.monotonic() - started, 3)
-            if completed.returncode != 0:
+            if not spec["artifact"].is_file():
                 stage["status"] = "failed"
-                stage["error"] = f"Process exited with code {completed.returncode}."
-            elif not spec["artifact"].is_file():
-                stage["status"] = "failed"
-                stage["error"] = "Process succeeded but the expected result artifact was not created."
+                stage["error"] = f"Process exited with code {completed.returncode} and did not create the expected result artifact."
             else:
                 stage["status"] = "completed"
                 stage.update(_read_artifact_summary(spec["artifact"]))
@@ -253,6 +250,19 @@ def run_workflow(
                 elif stage.get("artifact_model_id") != model_id:
                     stage["status"] = "failed"
                     stage["error"] = "Result model ID does not match the requested workflow model."
+                elif completed.returncode != 0:
+                    expected_gate_exit = (
+                        spec["name"] == "behavior-bench"
+                        and completed.returncode == 1
+                        and stage.get("metrics", {}).get("quality_gate_passed") is False
+                        and '"quality_gate"' in (completed.stdout or "")
+                        and not (completed.stderr or "").strip()
+                    )
+                    if expected_gate_exit:
+                        stage["note"] = "Behavior Bench returned exit code 1 because its configured regression gate failed; the artifact is validated and retained."
+                    else:
+                        stage["status"] = "failed"
+                        stage["error"] = f"Process exited with code {completed.returncode}."
         except subprocess.TimeoutExpired:
             stage["status"] = "failed"
             stage["error"] = f"Stage exceeded timeout of {timeout_seconds} seconds."
