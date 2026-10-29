@@ -18,7 +18,7 @@ from artifact_registry import scan_artifacts
 
 SUMMARY_FIELDS = (
     "project", "model_id", "run_id", "workflow_id", "created_at_utc", "schema_version",
-    "manifest_status", "row_count", "artifact_name", "path", "workflow_status", "quality_gate_passed",
+    "manifest_status", "row_count", "artifact_name", "path", "workflow_status", "quality_gate_passed", "html_report_path",
 )
 
 
@@ -32,6 +32,7 @@ def build_report(roots: Sequence[str]) -> dict:
         artifacts.append({key: item.get(key) for key in SUMMARY_FIELDS} | {
             "workflow_status": payload.get("status") if payload.get("schema_version") == "neuronlab.workflow.v1" else None,
             "quality_gate_passed": gate.get("passed") if isinstance(gate, dict) else None,
+            "html_report_path": payload.get("html_report_path") if payload.get("schema_version") == "neuronlab.workflow.v1" else None,
             "warnings": item["warnings"],
         })
     return {
