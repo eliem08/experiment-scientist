@@ -53,7 +53,7 @@ jobs:
           cache-dependency-path: experiment-scientist/requirements-evaluation.txt
       - name: Install runtime dependencies
         run: python -m pip install -r experiment-scientist/requirements-evaluation.txt
-      - name: Run five runnable tools on a real Hugging Face model
+      - name: Run five runnable tools (integration smoke; quality gate reported separately)
         id: evaluation
         continue-on-error: true
         env:
@@ -94,6 +94,74 @@ jobs:
               raise SystemExit("One or more real inference stages failed: " + details)
           print(f"All {len(stages)} runnable stages completed for model {report.get('model_id')}.")
           print(f"Workflow quality gate passed: {report.get('quality_gate', {}).get('passed')}")
+          PY
+      - name: Summarize execution and behavioral quality gate separately
+        if: always()
+        env:
+          EVALUATION_OUTCOME: ${{ steps.evaluation.outcome }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path("unified-smoke-output/workflow.json")
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          expected = {
+              "behavior-bench",
+              "safety-probe-lab",
+              "experiment-scientist",
+              "steering-studio",
+              "neural-flight-school",
+          }
+          if not report_path.is_file():
+              text = (
+                  "## Unified evaluation smoke\n\n"
+                  "- **Execution smoke:** FAIL — workflow.json was not produced.\n"
+                  "- **Behavioral quality gate:** unavailable.\n"
+                  f"- **Orchestrator process:** {os.environ.get('EVALUATION_OUTCOME', 'unknown')}\n"
+              )
+              Path(summary_path).write_text(text, encoding="utf-8")
+              print("::error::Unified workflow report is missing; inspect the evaluator logs.")
+              raise SystemExit(0)
+
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          stages = report.get("stages", [])
+          actual = {item.get("name") for item in stages}
+          failed = [item for item in stages if item.get("status") != "completed"]
+          execution_passed = actual == expected and not failed
+          quality_passed = report.get("quality_gate", {}).get("passed") is True
+          blockers = report.get("quality_gate", {}).get("blockers", [])
+
+          lines = [
+              "## Unified evaluation smoke",
+              "",
+              f"- **Execution smoke:** {'PASS' if execution_passed else 'FAIL'} "
+              f"({len(stages)}/{len(expected)} expected stages completed).",
+              f"- **Behavioral quality gate:** {'PASS' if quality_passed else 'FAIL'}.",
+              f"- **Model:** `{report.get('model_id', 'unknown')}` on "
+              f"`{report.get('device', 'unknown')}`.",
+              f"- **Orchestrator process outcome:** `{os.environ.get('EVALUATION_OUTCOME', 'unknown')}`.",
+          ]
+          if blockers:
+              lines.append(f"- **Quality-gate blockers:** {', '.join(blockers)}.")
+          if failed:
+              lines.append("- **Failed stages:** " + ", ".join(
+                  f"{item.get('name', 'unknown')} ({item.get('status', 'unknown')})"
+                  for item in failed
+              ) + ".")
+          lines += [
+              "",
+              "> A green integration-smoke job proves that configured stages executed and produced artifacts; "
+              "it does not imply the model passed the behavioral quality gate or is safe/correct.",
+              "",
+          ]
+          Path(summary_path).write_text("\n".join(lines), encoding="utf-8")
+          if not execution_passed:
+              print("::error::One or more integration smoke checks failed.")
+          if not quality_passed:
+              print("::warning::Behavioral quality gate failed; see workflow.json and Behavior Bench results.")
+          print("\n".join(lines))
           PY
       - name: Upload workflow report, logs, and evaluator artifacts
         if: always()
