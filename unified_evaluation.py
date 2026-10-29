@@ -6,6 +6,7 @@ and writes workflow.json linking the stages by one workflow ID.
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
 import subprocess
@@ -116,6 +117,67 @@ def _read_artifact_summary(path: Path) -> dict[str, Any]:
     return result
 
 
+
+def render_workflow_html(report: dict[str, Any], path: Path) -> None:
+    """Write a self-contained human-readable report without embedding model responses."""
+    rows = []
+    for stage in report.get("stages", []):
+        metrics = html.escape(json.dumps(stage.get("metrics", {}), indent=2, ensure_ascii=False))
+        cells = [
+            stage.get("name", ""),
+            stage.get("status", ""),
+            stage.get("exit_code", ""),
+            stage.get("duration_seconds", ""),
+            stage.get("artifact_model_id", ""),
+            stage.get("manifest_workflow_id", ""),
+            stage.get("error", ""),
+        ]
+        rows.append(
+            "<tr>" + "".join(f"<td>{html.escape(str(value))}</td>" for value in cells)
+            + f"<td><pre>{metrics}</pre></td></tr>"
+        )
+    gate = report.get("quality_gate", {})
+    gate_status = "PASS" if gate.get("passed") is True else "FAIL"
+    blockers = ", ".join(str(value) for value in gate.get("blockers", [])) or "None"
+    stage_rows = "\\n".join(rows) or '<tr><td colspan="8">No stages recorded.</td></tr>'
+    document = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeuronLab Unified Evaluation</title>
+<style>
+body{{font:16px/1.5 system-ui,sans-serif;max-width:1400px;margin:2rem auto;padding:0 1rem;color:#172033}}
+h1,h2{{line-height:1.2}} .summary{{display:flex;flex-wrap:wrap;gap:1rem;margin:1.5rem 0}}
+.card{{border:1px solid #ccd3df;border-radius:10px;padding:1rem;min-width:180px}}
+.status{{font-weight:700}} table{{width:100%;border-collapse:collapse;display:block;overflow-x:auto}}
+th,td{{border:1px solid #d7dce5;padding:.65rem;text-align:left;vertical-align:top}}
+th{{background:#f3f5f8}} pre{{white-space:pre-wrap;max-width:360px;margin:0;font-size:.85rem}}
+small{{color:#4b5563}}
+</style>
+</head>
+<body>
+<h1>NeuronLab Unified Evaluation</h1>
+<p><small>Workflow ID: {html.escape(str(report.get("workflow_id", "")))} | Model: {html.escape(str(report.get("model_id", "")))} | Device: {html.escape(str(report.get("device", "")))}</small></p>
+<div class="summary">
+<div class="card"><strong>Workflow status</strong><div>{html.escape(str(report.get("status", "")))}</div></div>
+<div class="card"><strong>Quality gate</strong><div class="status">{gate_status}</div></div>
+<div class="card"><strong>Stages</strong><div>{len(report.get("stages", []))}</div></div>
+<div class="card"><strong>Blockers</strong><div>{html.escape(blockers)}</div></div>
+</div>
+<h2>Stage results</h2>
+<table>
+<thead><tr><th>Stage</th><th>Status</th><th>Exit code</th><th>Seconds</th><th>Model ID</th><th>Workflow ID</th><th>Error</th><th>Metrics</th></tr></thead>
+<tbody>{stage_rows}</tbody>
+</table>
+<h2>Interpretation limits</h2>
+<p>Behavior Bench checks are configured regression signals, not a general semantic-quality guarantee. Safety Probe Lab marker matches are heuristic triage indicators, not a validated safety score. Experiment Scientist word deltas describe response length, not answer quality. A passing workflow is not a safety or correctness certification.</p>
+<p><small>Created: {html.escape(str(report.get("created_at_utc", "")))} | Completed: {html.escape(str(report.get("completed_at_utc", "")))}</small></p>
+</body>
+</html>
+"""
+    path.write_text(document, encoding="utf-8")
+
 def run_workflow(
     *, behavior_dir: Path, safety_dir: Path, experiment_dir: Path,
     model_id: str, cases: Path, output_root: Path, device: str = "auto",
@@ -220,7 +282,10 @@ def run_workflow(
         "artifacts": [stage["artifact"] for stage in stages if stage["status"] == "completed" and Path(stage["artifact"]).is_file()],
     }
     report_path = output_root / "workflow.json"
+    html_report_path = output_root / "workflow-report.html"
     report["report_path"] = str(report_path)
+    report["html_report_path"] = str(html_report_path)
+    render_workflow_html(report, html_report_path)
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return report
 
