@@ -62,10 +62,10 @@ def test_heuristic_counts_and_word_deltas_are_diagnostics_not_gate_metrics():
 
 
 def test_comparison_warns_when_configs_or_models_differ():
-    result = compare_workflows(
-        _workflow("baseline", model="model-a"),
-        _workflow("candidate", model="model-b"),
-    )
+    baseline = _workflow("baseline", model="model-a")
+    candidate = _workflow("candidate", model="model-b")
+    candidate["config"]["seed"] = 99
+    result = compare_workflows(baseline, candidate)
     assert any("configurations differ" in warning for warning in result["warnings"])
     assert any("Model IDs differ" in warning for warning in result["warnings"])
 
