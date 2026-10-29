@@ -86,6 +86,7 @@
           "duration_seconds": {"type": "number", "minimum": 0},
           "manifest_workflow_id": {"type": ["string", "null"]},
           "artifact_model_id": {"type": ["string", "null"]},
+          "artifact_device": {"type": ["string", "null"]},
           "error": {"type": "string"}
         },
         "additionalProperties": true
