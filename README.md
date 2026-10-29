@@ -22,3 +22,13 @@ The built-in examples are demonstrations, not a pre-registered study. Define hyp
 ## License
 
 MIT.
+
+## NeuronLab Workbench (local artifact history)
+
+The first integration shell can browse result artifacts from all six NeuronLab tools using the shared `neuronlab.run.v1` manifest. It is read-only and keeps artifacts on the machine; it does not upload data or run models.
+
+    streamlit run workbench_dashboard.py
+
+Enter one or more local output folders (or exact supported result JSON paths), then scan. The registry reports run IDs, model IDs, timestamps, manifest compatibility, malformed artifacts, and duplicate run IDs. Supported filenames include `results.json`, `probe-results.json`, `experiment.json`, `report.json`, `steering_report.json`, and `flight_school.json`. Older artifacts remain visible but are marked as legacy if they lack the shared manifest.
+
+For a combined history, place each tool's output directory under a common local folder and scan that folder. No cross-tool result rows are forced into one schema; the registry normalizes run provenance while preserving the raw JSON for inspection.
