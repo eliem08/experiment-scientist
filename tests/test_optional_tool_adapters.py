@@ -40,6 +40,9 @@ def _runner(command, *, cwd, env, capture_output, text, timeout, check):
     output = Path(command[command.index("--output") + 1])
     output.mkdir(parents=True, exist_ok=True)
     manifest = {"project": project, "run_id": project + "-run"}
+    if project not in {"steering-studio", "neural-flight-school"}:
+        manifest["workflow_id"] = env["NEURONLAB_WORKFLOW_ID"]
+        manifest["workflow_schema_version"] = env["NEURONLAB_WORKFLOW_SCHEMA"]
     payload = {"manifest": manifest}
     if project in {"behavior-bench", "experiment-scientist", "steering-studio"}:
         payload["model_id"] = command[command.index("--model-id") + 1]
