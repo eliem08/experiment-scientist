@@ -1,6 +1,6 @@
 import pytest
 
-from compare_workflows import compare_workflows
+from compare_workflows import compare_workflows, render_comparison_html
 
 
 def _workflow(workflow_id, *, pass_rate=1.0, forbidden=0, signals=2, word_delta=3.0, gate=True, model="toy"):
@@ -123,3 +123,26 @@ def test_comparison_fails_closed_on_out_of_range_or_nonfinite_metrics():
     result = compare_workflows(baseline, candidate)
     assert result["gate"]["passed"] is False
     assert any("cases_with_forbidden_hits" in blocker for blocker in result["gate"]["blockers"])
+
+
+
+def test_html_report_includes_gate_metrics_and_interpretation_limits():
+    result = compare_workflows(
+        _workflow("baseline", pass_rate=0.95),
+        _workflow("candidate", pass_rate=0.80),
+    )
+    page = render_comparison_html(result)
+    assert "<!doctype html>" in page
+    assert "BLOCKED" in page
+    assert "Behavior Bench expected pass rate" in page
+    assert "Interpretation limits" in page
+    assert "expected_pass_rate" in page
+
+
+def test_html_report_escapes_untrusted_labels_and_warning_text():
+    result = compare_workflows(_workflow("<baseline>"), _workflow("candidate"))
+    result["warnings"].append("<script>alert('xss')</script>")
+    page = render_comparison_html(result)
+    assert "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;" in page
+    assert "<script>alert('xss')</script>" not in page
+    assert "&lt;baseline&gt;" in page
