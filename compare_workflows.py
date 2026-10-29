@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,7 +59,15 @@ def compare_workflows(
             "stage": stage_name, "metric": metric, "label": label,
             "direction": direction, "baseline": old, "candidate": new,
         }
-        if isinstance(old, (int, float)) and not isinstance(old, bool) and isinstance(new, (int, float)) and not isinstance(new, bool):
+        valid_old = isinstance(old, (int, float)) and not isinstance(old, bool) and math.isfinite(float(old))
+        valid_new = isinstance(new, (int, float)) and not isinstance(new, bool) and math.isfinite(float(new))
+        if metric == "expected_pass_rate":
+            valid_old = valid_old and 0 <= old <= 1
+            valid_new = valid_new and 0 <= new <= 1
+        elif metric == "cases_with_forbidden_hits":
+            valid_old = valid_old and isinstance(old, int) and old >= 0
+            valid_new = valid_new and isinstance(new, int) and new >= 0
+        if valid_old and valid_new:
             item["delta"] = new - old
             if direction == "higher" and new < old - max_pass_rate_drop:
                 item["regression"] = True
@@ -74,7 +83,7 @@ def compare_workflows(
             if old is not None or new is not None:
                 warnings.append(f"Cannot compare {stage_name}.{metric}: numeric metric missing from baseline or candidate.")
             if stage_name == "behavior_bench" and metric in {"expected_pass_rate", "cases_with_forbidden_hits"}:
-                blockers.append(f"{metric}: required regression metric is missing or non-numeric; refusing to pass the comparison gate.")
+                blockers.append(f"{metric}: required regression metric is missing or invalid; refusing to pass the comparison gate.")
         comparisons.append(item)
 
     baseline_id = baseline.get("workflow_id")
