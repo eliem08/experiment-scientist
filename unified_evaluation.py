@@ -211,7 +211,7 @@ def run_workflow(
         "status": "completed" if all(stage["status"] == "completed" for stage in stages) else "failed",
         "quality_gate": {"passed": not gate_blockers, "blockers": gate_blockers},
         "stages": stages,
-        "artifacts": [stage["artifact"] for stage in stages if Path(stage["artifact"]).is_file()],
+        "artifacts": [stage["artifact"] for stage in stages if stage["status"] == "completed" and Path(stage["artifact"]).is_file()],
     }
     report_path = output_root / "workflow.json"
     report["report_path"] = str(report_path)
