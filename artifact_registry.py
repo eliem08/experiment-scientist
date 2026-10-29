@@ -49,7 +49,7 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
         manifest = {
             "project": "neuronlab-workflow-comparison",
             "model_id": candidate.get("model_id"),
-            "run_id": comparison_id,
+            "run_id": payload.get("comparison_id"),
             "created_at_utc": payload.get("created_at_utc"),
             "schema_version": comparison_version,
         }
@@ -88,7 +88,7 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
         "project": manifest.get("project") or payload.get("project") or "unknown",
         "model_id": payload.get("model_id") or payload.get("model") or manifest.get("model_id") or "unknown",
         "run_id": manifest.get("run_id"),
-        "workflow_id": manifest.get("workflow_id") or (payload.get("workflow_id") if is_workflow else (manifest.get("run_id") if is_comparison else None)),
+        "workflow_id": manifest.get("workflow_id") or (payload.get("workflow_id") if is_workflow else (candidate.get("workflow_id") if is_comparison else None)),
         "created_at_utc": manifest.get("created_at_utc"),
         "schema_version": manifest.get("schema_version"),
         "manifest_status": status,
