@@ -12,7 +12,7 @@ from typing import Any
 CONTRACT_VERSION = "neuronlab.run.v1"
 KNOWN_RESULT_NAMES = {
     "results.json", "probe-results.json", "experiment.json",
-    "report.json", "steering.json", "steering_report.json", "flight_school.json", "workflow.json", "workflow-comparison.json",
+    "report.json", "steering.json", "steering_report.json", "flight_school.json", "depth_report.json", "workflow.json", "workflow-comparison.json",
 }
 
 
@@ -33,6 +33,16 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
     """Load and normalize one result JSON file; never modifies source artifacts."""
     source = Path(path).expanduser().resolve()
     payload = json.loads(source.read_text(encoding="utf-8"))
+    if isinstance(payload, list) and source.name == "depth_report.json":
+        # Neuron Explorer's depth report is a JSON array rather than a NeuronLab
+        # manifest object. Normalize only its top-level layer records; preserve
+        # the fact that provenance is legacy instead of fabricating a run ID.
+        payload = {
+            "project": "neuron-explorer",
+            "layers": payload,
+            "summary": {"layers": len(payload)},
+            "warning": "Imported precomputed Neuron Explorer depth report; this registry did not run the GPU sweep.",
+        }
     if not isinstance(payload, dict):
         raise ValueError("Artifact root must be a JSON object.")
     is_workflow = source.name == "workflow.json"
