@@ -84,3 +84,12 @@ def test_comparison_rejects_invalid_thresholds():
         compare_workflows(_workflow("a"), _workflow("b"), max_pass_rate_drop=1.5)
     with pytest.raises(ValueError, match="max_forbidden_hit_increase"):
         compare_workflows(_workflow("a"), _workflow("b"), max_forbidden_hit_increase=-1)
+
+
+def test_comparison_warns_when_case_suite_fingerprints_differ():
+    baseline = _workflow("baseline")
+    candidate = _workflow("candidate")
+    baseline["reproducibility"] = {"case_suite": {"sha256": "a" * 64}}
+    candidate["reproducibility"] = {"case_suite": {"sha256": "b" * 64}}
+    result = compare_workflows(baseline, candidate)
+    assert any("Case-suite SHA-256 fingerprints differ" in warning for warning in result["warnings"])
