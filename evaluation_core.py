@@ -281,20 +281,15 @@ class LLMJudgeEvaluator(_BaseEvaluator):
                 label, rationale = decision.get("label"), decision.get("rationale")
                 if not isinstance(label, str) or not isinstance(rationale, str):
                     raise ValueError("label and rationale must be strings")
-                return self._result(
+                result = self._result(
                     item, float(score), label=label, rationale=rationale,
                     metadata={
                         **context, "score_min": self.minimum_score, "score_max": self.maximum_score,
                         "judge_decision_sha256": _canonical_hash(decision),
                     },
-                ).__class__(
-                    **{
-                        **asdict(self._result(item, float(score), label=label, rationale=rationale,
-                            metadata={**context, "score_min": self.minimum_score, "score_max": self.maximum_score,
-                                      "judge_decision_sha256": _canonical_hash(decision)})),
-                        "raw_decision": decision,
-                    }
                 )
+                result.raw_decision = dict(decision)
+                return result
             except (ValueError, TypeError, json.JSONDecodeError) as exc:
                 last_error = str(exc)
             except Exception as exc:  # provider adapter failures become explicit failed rows
