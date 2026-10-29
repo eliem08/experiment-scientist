@@ -114,6 +114,9 @@ def test_comparison_fails_closed_on_out_of_range_or_nonfinite_metrics():
     result = compare_workflows(baseline, candidate)
     assert result["gate"]["passed"] is False
     assert any("expected_pass_rate" in blocker for blocker in result["gate"]["blockers"])
+    assert result["comparisons"][0]["candidate"] is None
+    import json
+    json.dumps(result, allow_nan=False)
 
     baseline = _workflow("baseline", forbidden=0)
     candidate = _workflow("candidate", forbidden=-1)
