@@ -97,10 +97,38 @@ def compare_workflows(
         warnings.append("Baseline and candidate share a workflow_id; verify that distinct runs were intended.")
     if baseline.get("config") != candidate.get("config"):
         warnings.append("Workflow configurations differ; metric changes may be confounded by settings.")
-    baseline_case_hash = baseline.get("reproducibility", {}).get("case_suite", {}).get("sha256")
-    candidate_case_hash = candidate.get("reproducibility", {}).get("case_suite", {}).get("sha256")
-    if baseline_case_hash and candidate_case_hash and baseline_case_hash != candidate_case_hash:
+    baseline_repro = baseline.get("reproducibility")
+    candidate_repro = candidate.get("reproducibility")
+    baseline_repro = baseline_repro if isinstance(baseline_repro, dict) else {}
+    candidate_repro = candidate_repro if isinstance(candidate_repro, dict) else {}
+    baseline_suite = baseline_repro.get("case_suite")
+    candidate_suite = candidate_repro.get("case_suite")
+    baseline_suite = baseline_suite if isinstance(baseline_suite, dict) else {}
+    candidate_suite = candidate_suite if isinstance(candidate_suite, dict) else {}
+    baseline_case_hash = baseline_suite.get("sha256")
+    candidate_case_hash = candidate_suite.get("sha256")
+    if not baseline_case_hash or not candidate_case_hash:
+        warnings.append("Case-suite SHA-256 fingerprint is missing from the baseline or candidate; same-suite comparability cannot be verified.")
+    elif baseline_case_hash != candidate_case_hash:
         warnings.append("Case-suite SHA-256 fingerprints differ; results are not a strict same-suite comparison.")
+
+    baseline_scripts = baseline_repro.get("runner_scripts")
+    candidate_scripts = candidate_repro.get("runner_scripts")
+    if not isinstance(baseline_scripts, dict) or not isinstance(candidate_scripts, dict):
+        warnings.append("Runner-script fingerprints are missing; evaluator-code comparability cannot be verified.")
+    else:
+        shared_scripts = set(baseline_scripts) & set(candidate_scripts)
+        if not shared_scripts:
+            warnings.append("No matching runner-script fingerprints are available to compare.")
+        for script_name in sorted(shared_scripts):
+            old_details = baseline_scripts.get(script_name)
+            new_details = candidate_scripts.get(script_name)
+            old_hash = old_details.get("sha256") if isinstance(old_details, dict) else None
+            new_hash = new_details.get("sha256") if isinstance(new_details, dict) else None
+            if not old_hash or not new_hash:
+                warnings.append(f"Runner-script SHA-256 fingerprint missing for {script_name}; code comparability cannot be verified.")
+            elif old_hash != new_hash:
+                warnings.append(f"Runner-script SHA-256 fingerprints differ for {script_name}; evaluator code changed between runs.")
     if baseline.get("model_id") != candidate.get("model_id"):
         warnings.append("Model IDs differ; this is a model comparison, not a controlled same-model regression check.")
     if baseline.get("quality_gate", {}).get("passed") is not True:
