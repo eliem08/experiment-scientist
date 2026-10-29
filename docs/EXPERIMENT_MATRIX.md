@@ -55,3 +55,25 @@ The supported metrics are intentionally simple and auditable. Add a separately v
 - The spec hash supports auditability, but does not independently prove the spec was authored before any exploratory results.
 - Results include model responses; protect the output directory if prompts or generations contain sensitive data.
 - A passing rule-based metric or favorable effect size is not a safety or correctness certification.
+
+
+## 6. Pin model versions and resume safely
+
+For stronger repeatability, pin model and tokenizer revisions to immutable Hugging Face commit SHAs:
+
+\`\`\`bash
+python experiment_matrix.py \
+  --spec examples/uncertainty-ablation.spec.json \
+  --model-id distilgpt2 \
+  --revision MODEL_COMMIT_SHA \
+  --tokenizer-revision TOKENIZER_COMMIT_SHA \
+  --seeds 17,29,43,71,101 \
+  --resume \
+  --output outputs/pinned-ablation
+\`\`\`
+
+`--tokenizer-revision` defaults to `--revision`. If the flags are omitted, the Hugging Face default revision is used, which may move over time.
+
+With `--resume`, `matrix-checkpoint.json` is written after each completed paired case. The checkpoint fingerprint includes the spec hash, model list, device, seed list, generation settings, and requested model/tokenizer revisions. A mismatched configuration is rejected; partial or duplicate metric sets are rejected; already complete pairs are skipped. If the process dies during an in-flight pair, that pair may be rerun, but earlier checkpointed pairs remain available. Do not edit the checkpoint manually.
+
+The final result records requested and resolved model/tokenizer revisions when available, Python/platform, PyTorch and Transformers versions, CUDA metadata, and `GITHUB_SHA` when present. These details improve traceability but do not guarantee bit-identical results across hardware, drivers, kernels, or dependency combinations. The checkpoint contains full model responses and should be treated as potentially sensitive.
