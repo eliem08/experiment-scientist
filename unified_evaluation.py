@@ -157,7 +157,7 @@ def render_workflow_html(report: dict[str, Any], path: Path) -> None:
                     "<tr><td>" + html.escape(str(name)) + "</td><td>" + html.escape(str(details.get("path", "")))
                     + "</td><td><code>" + html.escape(str(details.get("sha256", ""))) + "</code></td></tr>"
                 )
-    fingerprint_table = "\\n".join(fingerprint_rows) or '<tr><td colspan="3">No fingerprints recorded.</td></tr>'
+    fingerprint_table = "\n".join(fingerprint_rows) or '<tr><td colspan="3">No fingerprints recorded.</td></tr>'
     gate = report.get("quality_gate", {})
     gate_status = "PASS" if gate.get("passed") is True else "FAIL"
     blockers = ", ".join(str(value) for value in gate.get("blockers", [])) or "None"
