@@ -12,7 +12,7 @@ from typing import Any
 CONTRACT_VERSION = "neuronlab.run.v1"
 KNOWN_RESULT_NAMES = {
     "results.json", "probe-results.json", "experiment.json",
-    "report.json", "steering_report.json", "flight_school.json",
+    "report.json", "steering_report.json", "flight_school.json", "workflow.json",
 }
 
 
@@ -35,10 +35,26 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
     payload = json.loads(source.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("Artifact root must be a JSON object.")
+    is_workflow = source.name == "workflow.json"
     manifest = payload.get("manifest")
-    status, warnings = _manifest_status(manifest)
-    if not isinstance(manifest, dict):
-        manifest = {}
+    if is_workflow:
+        warnings = []
+        workflow_version = payload.get("schema_version")
+        workflow_id = payload.get("workflow_id")
+        status = "valid" if workflow_version == "neuronlab.workflow.v1" and workflow_id else "legacy"
+        if status == "legacy":
+            warnings.append("Missing or unsupported unified workflow schema/ID.")
+        manifest = {
+            "project": "neuronlab-unified-workflow",
+            "model_id": payload.get("model_id"),
+            "run_id": workflow_id,
+            "created_at_utc": payload.get("created_at_utc"),
+            "schema_version": workflow_version,
+        }
+    else:
+        status, warnings = _manifest_status(manifest)
+        if not isinstance(manifest, dict):
+            manifest = {}
     rows = payload.get("cases")
     if not isinstance(rows, list):
         rows = payload.get("results")
@@ -46,6 +62,8 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
         rows = payload.get("layers")
     if not isinstance(rows, list):
         rows = payload.get("interventions")
+    if not isinstance(rows, list):
+        rows = payload.get("stages")
     if not isinstance(rows, list):
         rows = [{"id": "baseline", "response": payload["baseline"]}] if isinstance(payload.get("baseline"), str) else []
     return {
