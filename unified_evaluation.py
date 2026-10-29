@@ -1,7 +1,8 @@
-"""Run Behavior Bench, Safety Probe Lab, and Experiment Scientist as one workflow.
+"""Run configured NeuronLab tools as one provenance-linked workflow.
 
-This orchestrator reuses each tool's existing CLI, keeps its result files separate,
-and writes workflow.json linking the stages by one workflow ID.
+The three core evaluators remain required. Steering Studio and Neural Flight School
+are optional adapters; Neuron Explorer is integrated as a read-only artifact source.
+Native artifacts remain separate and are linked by the parent workflow report.
 """
 from __future__ import annotations
 
@@ -30,9 +31,11 @@ def build_stage_specs(
     *, behavior_dir: Path, safety_dir: Path, experiment_dir: Path,
     model_id: str, cases: Path, output_root: Path, device: str,
     max_new_tokens: int, seed: int, minimum_failing_severity: str | None = None,
+    steering_dir: Path | None = None, flight_school_dir: Path | None = None,
+    steering_layer: int = 6,
 ) -> list[dict[str, Any]]:
-    """Build explicit subprocess specs for the three supported local evaluators."""
-    return [
+    """Build explicit subprocess specs for configured local tools."""
+    specs = [
         {
             "name": "behavior-bench",
             "cwd": behavior_dir,
@@ -71,6 +74,34 @@ def build_stage_specs(
             "artifact": output_root / "experiment-scientist" / "experiment.json",
         },
     ]
+    if steering_dir is not None:
+        specs.append({
+            "name": "steering-studio",
+            "cwd": steering_dir,
+            "script": steering_dir / "activation_steering.py",
+            "output": output_root / "steering-studio",
+            "command": [
+                sys.executable, str(steering_dir / "activation_steering.py"),
+                "--model-id", model_id, "--output", str(output_root / "steering-studio"),
+                "--device", device, "--max-new-tokens", str(max_new_tokens),
+                "--layer", str(steering_layer),
+            ],
+            "artifact": output_root / "steering-studio" / "steering.json",
+        })
+    if flight_school_dir is not None:
+        specs.append({
+            "name": "neural-flight-school",
+            "cwd": flight_school_dir,
+            "script": flight_school_dir / "attention_lab.py",
+            "output": output_root / "neural-flight-school",
+            "command": [
+                sys.executable, str(flight_school_dir / "attention_lab.py"),
+                "--output", str(output_root / "neural-flight-school"),
+                "--device", device, "--seed", str(seed),
+            ],
+            "artifact": output_root / "neural-flight-school" / "report.json",
+        })
+    return specs
 
 
 def _read_artifact_summary(path: Path) -> dict[str, Any]:
@@ -105,6 +136,22 @@ def _read_artifact_summary(path: Path) -> dict[str, Any]:
                 "probes": len(rows),
                 "heuristic_signals": sum(row.get("heuristic_signal") is True for row in rows),
                 "warning": payload.get("warning"),
+            }
+        elif project == "steering-studio":
+            result["metrics"] = {
+                "layer": payload.get("layer"),
+                "scale": payload.get("scale"),
+                "baseline_chars": len(payload.get("baseline", "")) if isinstance(payload.get("baseline"), str) else None,
+                "steered_chars": len(payload.get("steered", "")) if isinstance(payload.get("steered"), str) else None,
+                "interpretation": "Exploratory activation intervention; not a validated control method.",
+            }
+        elif project == "neural-flight-school":
+            layers = payload.get("layers", [])
+            layers = [row for row in layers if isinstance(row, dict)] if isinstance(layers, list) else []
+            result["metrics"] = {
+                "layers": len(layers),
+                "token_count": payload.get("token_count"),
+                "interpretation": "Randomly initialized untrained model; educational tensor demonstration only.",
             }
         elif project == "experiment-scientist":
             rows = payload.get("results", [])
@@ -207,7 +254,10 @@ def run_workflow(
     *, behavior_dir: Path, safety_dir: Path, experiment_dir: Path,
     model_id: str, cases: Path, output_root: Path, device: str = "auto",
     max_new_tokens: int = 96, seed: int = 17, timeout_seconds: int = 7200,
-    minimum_failing_severity: str | None = None, runner=subprocess.run,
+    minimum_failing_severity: str | None = None,
+    steering_dir: Path | None = None, flight_school_dir: Path | None = None,
+    steering_layer: int = 6,
+    runner=subprocess.run,
 ) -> dict[str, Any]:
     """Execute all stages and produce a machine-readable unified report."""
     if max_new_tokens < 1:
@@ -223,6 +273,8 @@ def run_workflow(
         behavior_dir=behavior_dir, safety_dir=safety_dir, experiment_dir=experiment_dir,
         model_id=model_id, cases=cases, output_root=output_root, device=device,
         max_new_tokens=max_new_tokens, seed=seed, minimum_failing_severity=minimum_failing_severity,
+        steering_dir=steering_dir, flight_school_dir=flight_school_dir,
+        steering_layer=steering_layer,
     )
     for spec in specs:
         if not spec["cwd"].is_dir():
@@ -264,13 +316,26 @@ def run_workflow(
             else:
                 stage["status"] = "completed"
                 stage.update(_read_artifact_summary(spec["artifact"]))
+                # Link older tools to this invocation after a fresh artifact exists.
+                if stage.get("artifact_readable") and spec["name"] in {"steering-studio", "neural-flight-school"}:
+                    try:
+                        payload = json.loads(spec["artifact"].read_text(encoding="utf-8"))
+                        manifest = payload.get("manifest")
+                        if isinstance(manifest, dict) and not manifest.get("workflow_id"):
+                            manifest["workflow_id"] = workflow_id
+                            manifest["workflow_schema_version"] = SCHEMA_VERSION
+                            spec["artifact"].write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                            stage["workflow_id_injected_by_orchestrator"] = True
+                            stage["manifest_workflow_id"] = workflow_id
+                    except (OSError, UnicodeError, json.JSONDecodeError):
+                        pass
                 if stage.get("artifact_readable") is False:
                     stage["status"] = "failed"
                     stage["error"] = "Result artifact exists but is not valid JSON."
                 elif stage.get("manifest_workflow_id") != workflow_id:
                     stage["status"] = "failed"
                     stage["error"] = "Result manifest workflow_id does not match this invocation; refusing to mix stale or unlinked results."
-                elif stage.get("artifact_model_id") != model_id:
+                elif stage.get("artifact_model_id") is not None and stage.get("artifact_model_id") != model_id:
                     stage["status"] = "failed"
                     stage["error"] = "Result model ID does not match the requested workflow model."
                 elif completed.returncode != 0:
@@ -311,6 +376,11 @@ def run_workflow(
         "behavior_bench": stage_metrics.get("behavior-bench", {}),
         "safety_probe_lab": stage_metrics.get("safety-probe-lab", {}),
         "experiment_scientist": stage_metrics.get("experiment-scientist", {}),
+        "additional_tools": {
+            name: stage_metrics.get(name, {})
+            for name in ("steering-studio", "neural-flight-school")
+            if name in stage_metrics
+        },
     }
     def sha256_file(path: Path) -> str:
         digest = hashlib.sha256()
@@ -364,6 +434,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--behavior-bench-dir", type=Path, default=here.parent / "behavior-bench")
     parser.add_argument("--safety-probe-dir", type=Path, default=here.parent / "safety-probe-lab")
     parser.add_argument("--experiment-scientist-dir", type=Path, default=here)
+    parser.add_argument("--steering-studio-dir", type=Path, help="Optional Steering Studio repository directory.")
+    parser.add_argument("--neural-flight-school-dir", type=Path, help="Optional Neural Flight School repository directory.")
+    parser.add_argument("--steering-layer", type=int, default=6, help="Transformer block for Steering Studio (must exist in the selected model).")
     parser.add_argument("--model-id", default="distilgpt2")
     parser.add_argument("--cases", type=Path, help="JSONL case suite; defaults to behavior-bench/examples/cases.jsonl")
     parser.add_argument("--output", type=Path, default=Path("outputs/unified-evaluation"))
@@ -376,6 +449,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     behavior_dir = args.behavior_bench_dir.expanduser().resolve()
     safety_dir = args.safety_probe_dir.expanduser().resolve()
     experiment_dir = args.experiment_scientist_dir.expanduser().resolve()
+    steering_dir = args.steering_studio_dir.expanduser().resolve() if args.steering_studio_dir else None
+    flight_school_dir = args.neural_flight_school_dir.expanduser().resolve() if args.neural_flight_school_dir else None
     cases = (args.cases or (behavior_dir / "examples" / "cases.jsonl")).expanduser().resolve()
     output_root = args.output.expanduser().resolve()
     try:
@@ -384,6 +459,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             model_id=args.model_id, cases=cases, output_root=output_root, device=args.device,
             max_new_tokens=args.max_new_tokens, seed=args.seed, timeout_seconds=args.timeout_seconds,
             minimum_failing_severity=args.minimum_failing_severity,
+            steering_dir=steering_dir, flight_school_dir=flight_school_dir,
+            steering_layer=args.steering_layer,
         )
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))

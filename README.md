@@ -30,7 +30,7 @@ The integration shell can browse, filter, summarize, compare, and export result 
     python -m pip install -r requirements-workbench.txt
     streamlit run workbench_dashboard.py
 
-Enter one or more local output folders (or exact supported result JSON paths), then scan. The registry reports run IDs, model IDs, timestamps, manifest compatibility, malformed artifacts, and duplicate run IDs. Supported filenames include `results.json`, `probe-results.json`, `experiment.json`, `report.json`, `steering_report.json`, and `flight_school.json`. Older artifacts remain visible but are marked as legacy if they lack the shared manifest.
+Enter one or more local output folders (or exact supported result JSON paths), then scan. The registry reports run IDs, model IDs, timestamps, manifest compatibility, malformed artifacts, and duplicate run IDs. Supported filenames include `results.json`, `probe-results.json`, `experiment.json`, `report.json`, `steering.json`, `steering_report.json`, `flight_school.json`, and `depth_report.json`. Neuron Explorer's precomputed `depth_report.json` is imported as a legacy artifact because its GPU-backed sweep is not a single-run local evaluator; the Workbench does not launch that sweep. Older artifacts remain visible but are marked as legacy if they lack the shared manifest.
 
 For a combined history, place each tool's output directory under a common local folder and scan that folder. No cross-tool result rows are forced into one schema; the registry normalizes run provenance while preserving the raw JSON for inspection.
 
@@ -48,9 +48,9 @@ The CLI exports normalized run metadata, manifest warnings, read errors, and dup
 
 ## Unified evaluation workflow
 
-The unified runner currently orchestrates the three local Transformers evaluators in Behavior Bench, Safety Probe Lab, and Experiment Scientist, using the same model ID, device, and generation-token limit. It does not yet orchestrate API-only evaluation or the interpretability/steering tools. Each tool still writes its own native artifact and log; the runner adds a shared workflow ID to each provenance manifest and creates a top-level `workflow.json` plus a self-contained `workflow-report.html` with stage statuses, artifact paths, key metrics, and a consolidated quality gate. A failed stage does not silently disappear: later stages still run, and the workflow exits non-zero.
+The unified runner always executes the three core local evaluators (Behavior Bench, Safety Probe Lab, and Experiment Scientist). It can additionally execute Steering Studio and Neural Flight School when their repository paths are supplied. Each tool keeps its native artifact; the runner links the outputs in `workflow.json` and a self-contained `workflow-report.html`. Optional tools are not silently treated as complete when their paths are omitted. The sixth tool, Neuron Explorer, is integrated into artifact history through precomputed `depth_report.json` files. Its GPU-backed sweep is deliberately not launched automatically; use its own documented sweep workflow, then point the Workbench at the resulting directory. A failed stage stays visible, later stages still run, and the quality gate fails.
 
-Clone the three repositories as sibling folders next to `experiment-scientist`. On Windows, `./setup_unified_evaluation.ps1` clones the two sibling repositories if missing, creates `.venv`, and installs the lean runtime dependencies from `requirements-evaluation.txt`. Use `-SkipInstall` to clone only. On macOS/Linux, clone the sibling repositories manually. Then run from this repository:
+Clone the repositories as sibling folders next to `experiment-scientist`. On Windows, `./setup_unified_evaluation.ps1` clones the two core sibling repositories if missing, creates `.venv`, and installs the runtime dependencies from `requirements-evaluation.txt`. Use `-SkipInstall` to clone only. On macOS/Linux, clone the repositories manually. Then run from this repository:
 
     python -m venv .venv
     # Windows PowerShell: .\.venv\Scripts\Activate.ps1
@@ -58,7 +58,10 @@ Clone the three repositories as sibling folders next to `experiment-scientist`. 
     python -m pip install -r requirements-evaluation.txt
     python unified_evaluation.py --model-id distilgpt2 --device cpu
 
-On Windows PowerShell, use the same command, or run `./run_unified_evaluation.ps1 --model-id distilgpt2 --device cpu`.
+# Optional research adapters (requires both sibling repositories)
+python unified_evaluation.py --model-id gpt2 --device cpu --steering-studio-dir ../steering-studio --neural-flight-school-dir ../neural-flight-school
+
+On Windows PowerShell, use the same command, or run `./run_unified_evaluation.ps1 --model-id distilgpt2 --device cpu`. Steering Studio defaults to transformer layer 6; use `--steering-layer 1` for small GPT-2 variants that have fewer layers.
 
 To customize paths or output:
 
@@ -86,4 +89,4 @@ Safety Probe Lab heuristic counts and Experiment Scientist response-length delta
 
 ### Real-model smoke run in GitHub Actions
 
-The manual workflow [`unified-smoke.yml`](.github/workflows/unified-smoke.yml) runs all three evaluators against an actual Hugging Face model on CPU, validates that every stage completed, and uploads the JSON/HTML report plus logs as a workflow artifact. To run it, open the repository's **Actions** tab, select **unified-evaluation-smoke**, click **Run workflow**, and keep the default `sshleifer/tiny-gpt2` model for the smallest initial download. The regression/quality gate may legitimately fail on a tiny model; the smoke check distinguishes that from an evaluator execution failure. This manual run has to be triggered from GitHub and has not been claimed as completed until its artifact is available.
+The workflow [`unified-smoke.yml`](.github/workflows/unified-smoke.yml) runs automatically on pull requests and can also be started manually; it runs all five executable stages against an actual Hugging Face model on CPU, validates that every stage completed, and uploads the JSON/HTML report plus logs as a workflow artifact. It checks out Steering Studio and Neural Flight School as well as the three core repositories. To run it manually, open the repository's **Actions** tab, select **unified-evaluation-smoke**, click **Run workflow**, and keep the default `sshleifer/tiny-gpt2` model for the smallest initial download. The regression/quality gate may legitimately fail on a tiny model; the smoke check distinguishes that from an evaluator execution failure. This manual run has to be triggered from GitHub and has not been claimed as completed until its artifact is available.

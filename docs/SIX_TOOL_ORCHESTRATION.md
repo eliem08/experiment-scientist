@@ -1,0 +1,92 @@
+# Six-Tool Orchestration: Implementation Contract
+
+**Status:** five executable adapters implemented; a manual real-model smoke workflow now covers all five, with the sixth integrated as artifact-import only  
+**Target:** extend the existing unified evaluation workflow without weakening its current provenance, failure-reporting, or quality-gate behavior.
+
+## Current verified baseline
+
+The current `unified_evaluation.py` workflow always executes three local evaluators and can optionally execute two more:
+
+1. Behavior Bench
+2. Safety Probe Lab
+3. Experiment Scientist
+4. Steering Studio (optional, `--steering-studio-dir`)
+5. Neural Flight School (optional, `--neural-flight-school-dir`)
+
+The Workbench also imports precomputed Neuron Explorer `depth_report.json` files. Neuron Explorer's main workflow is a GPU-backed interactive/sweep system, not a simple one-shot evaluator, so it is intentionally not launched automatically. This is six-tool artifact-history coverage, not six automatic model executions.
+
+## Goals
+
+- Run each configured tool through an explicit adapter, not shell-string guessing.
+- Keep each tool's native artifact intact and record its path in the parent workflow.
+- Add a shared workflow ID and schema version to child provenance where the tool supports it; otherwise record the limitation explicitly in the stage record.
+- Continue later stages after a stage failure, preserving partial results and logs.
+- Distinguish execution status from metric quality and from tool availability.
+- Keep API-backed stages opt-in. Never require secrets for the local-only default, and never print credentials into reports or logs.
+- Never compare incomparable metrics or present heuristic indicators as validated safety/correctness scores.
+
+## Stage record contract
+
+Every configured stage should have these fields, where available:
+
+- `name`, `kind` (`local_command` or `api`), `status`
+- sanitized argument list or a redacted API operation description
+- `started_at_utc`, `completed_at_utc`, `elapsed_seconds`
+- `exit_code`, `error`, `log_path`
+- `expected_artifacts`, `artifacts`
+- `workflow_id_propagated` (boolean) and `provenance_warnings`
+- `metrics` with source/meaning metadata, never an unlabelled mixed metric
+
+Use a finite status vocabulary: `pending`, `running`, `completed`, `failed`, `timed_out`, `skipped`, `unavailable`. A missing optional integration should be `unavailable` or `skipped`, not silently reported as completed.
+
+## Implementation sequence
+
+### Phase 1 — adapter registry and preflight
+
+- Define a declarative stage registry with required paths, commands, environment requirements, expected artifacts, timeout, and whether the stage is enabled by default.
+- Validate all configured local paths and executable entry points before expensive model downloads.
+- Support an explicit selected-stage list so a developer can smoke-test one adapter without pretending the full suite ran.
+- Keep the existing three-stage invocation and report shape compatible.
+
+**Acceptance:** unit tests cover valid configuration, missing paths, invalid stage names, duplicate stage names, and API stages disabled by default.
+
+### Phase 2 — local tool adapters (implemented; real-model smoke pending)
+
+- Completed: Steering Studio and Neural Flight School adapters, with native output preservation and synthetic tests.
+- Completed: read-only import of precomputed Neuron Explorer depth reports.
+- A GitHub Actions smoke workflow now runs on pull requests (and can also be started manually), checks out the four sibling tool repositories, runs the five executable stages on a real Hugging Face model, and uploads the workflow report and native artifacts.
+- Neuron Explorer remains a read-only import because its GPU-backed sweep is a separate workflow; validate import with a real `depth_report.json` when one is available.
+- Preserve each tool's native artifact and add a small normalized stage summary only.
+- Add synthetic-fixture tests for success, non-zero exit, missing artifact, malformed JSON, timeout, and workflow-ID mismatch.
+
+**Acceptance:** five runnable stages can be invoked in one workflow when optional repositories are provided; the sixth tool's precomputed depth report can be discovered by the Workbench. This does not claim an automatic six-stage inference run.
+
+### Phase 3 — API-backed integration
+
+- Add API-backed adapters only after the provider, request semantics, data handling, rate limits, and output schema are specified.
+- Require explicit opt-in and environment-based credentials.
+- Redact authorization headers, tokens, and sensitive request fields from logs and reports.
+- Store request/response payloads only according to an explicit retention setting; never upload local artifacts by default.
+
+**Acceptance:** tests verify missing credentials, provider errors, rate limits, redaction, and opt-in behavior without making live network calls.
+
+### Phase 4 — cross-tool report and quality gate
+
+- Keep per-tool metrics separate by default.
+- Permit cross-tool comparisons only when a documented mapping establishes compatible definitions, units, datasets, and directionality.
+- Report stage execution, artifact validity, provenance completeness, and quality-gate outcome as separate dimensions.
+- Keep HTML output self-contained and ensure paths are clearly marked as local artifacts.
+
+**Acceptance:** regression tests prove that a completed run may still fail the quality gate, failed stages remain visible, and diagnostic heuristics do not silently become certification claims.
+
+## Non-goals
+
+- No forced common schema for full model responses.
+- No automatic uploading of artifacts.
+- No claim that stage completion establishes model safety, correctness, or scientific validity.
+- No hard-coded secrets or automatic API execution.
+- No speculative adapters for unidentified repositories.
+
+## Remaining verification
+
+GitHub Actions unit tests have passed on the previous implementation commit; confirm the newest run after this change. Confirm the pull-request five-tool real-model smoke workflow passes before calling the integration end-to-end validated. Verify Neuron Explorer imports against a real `depth_report.json`. Do not enable automatic GPU sweeps or API-backed evaluation by default.
