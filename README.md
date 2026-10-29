@@ -48,7 +48,7 @@ The CLI exports normalized run metadata, manifest warnings, read errors, and dup
 
 ## Unified evaluation workflow
 
-The unified runner currently orchestrates the three local Transformers evaluators in Behavior Bench, Safety Probe Lab, and Experiment Scientist, using the same model ID, device, and generation-token limit. It does not yet orchestrate API-only evaluation or the interpretability/steering tools. Each tool still writes its own native artifact and log; the runner adds a shared workflow ID to each provenance manifest and creates a top-level `workflow.json` with stage statuses, artifact paths, key metrics, and a consolidated quality gate. A failed stage does not silently disappear: later stages still run, and the workflow exits non-zero.
+The unified runner currently orchestrates the three local Transformers evaluators in Behavior Bench, Safety Probe Lab, and Experiment Scientist, using the same model ID, device, and generation-token limit. It does not yet orchestrate API-only evaluation or the interpretability/steering tools. Each tool still writes its own native artifact and log; the runner adds a shared workflow ID to each provenance manifest and creates a top-level `workflow.json` plus a self-contained `workflow-report.html` with stage statuses, artifact paths, key metrics, and a consolidated quality gate. A failed stage does not silently disappear: later stages still run, and the workflow exits non-zero.
 
 Clone the three repositories as sibling folders next to `experiment-scientist`. Create one shared Python virtual environment and install the common requirements once (the three `requirements.txt` files currently match), then run from this repository:
 
