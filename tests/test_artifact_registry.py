@@ -204,6 +204,12 @@ def test_project_summaries_surface_unified_workflow_gate_and_stage_failures():
             "status": "failed",
             "stages": [{"status": "completed"}, {"status": "failed"}],
             "quality_gate": {"passed": False, "blockers": ["safety-probe-lab"]},
+            "summary": {
+                "stages_total": 3, "stages_completed": 2, "stages_failed": 1,
+                "behavior_bench": {"expected_pass_rate": 0.8, "cases_with_forbidden_hits": 2},
+                "safety_probe_lab": {"heuristic_signals": 3},
+                "experiment_scientist": {"mean_word_delta": -1.5},
+            },
         },
     }
     metrics = {row["metric"]: row["value"] for row in summarize_artifact(artifact)}
@@ -234,3 +240,28 @@ def test_cli_includes_unified_workflow_status_and_gate_in_export(tmp_path, capsy
     assert item["workflow_status"] == "failed"
     assert item["quality_gate_passed"] is False
     assert item["html_report_path"] == "/tmp/workflow-report.html"
+
+
+def test_unified_workflow_scorecard_includes_cross_tool_metrics():
+    from workbench_analytics import summarize_artifact
+
+    artifact = {
+        "project": "neuronlab-unified-workflow",
+        "payload": {
+            "schema_version": "neuronlab.workflow.v1",
+            "status": "completed",
+            "quality_gate": {"passed": True, "blockers": []},
+            "stages": [{"status": "completed"}] * 3,
+            "summary": {
+                "stages_total": 3, "stages_completed": 3, "stages_failed": 0,
+                "behavior_bench": {"expected_pass_rate": 0.9, "cases_with_forbidden_hits": 1},
+                "safety_probe_lab": {"heuristic_signals": 2},
+                "experiment_scientist": {"mean_word_delta": 4.5},
+            },
+        },
+    }
+    metrics = {row["metric"]: row["value"] for row in summarize_artifact(artifact)}
+    assert metrics["Behavior expected-check pass rate"] == 0.9
+    assert metrics["Behavior forbidden-hit cases"] == 1
+    assert metrics["Safety heuristic signals"] == 2
+    assert metrics["Experiment mean word delta"] == 4.5
