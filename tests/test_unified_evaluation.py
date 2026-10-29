@@ -136,6 +136,7 @@ def test_unified_workflow_rejects_stale_artifacts_with_wrong_workflow_id(tmp_pat
     assert report["quality_gate"]["passed"] is False
     assert all(stage["status"] == "failed" for stage in report["stages"])
     assert all("does not match" in stage["error"] for stage in report["stages"])
+    assert report["artifacts"] == []
 
 
 def test_unified_workflow_rejects_mixed_model_artifacts(tmp_path):
@@ -148,3 +149,4 @@ def test_unified_workflow_rejects_mixed_model_artifacts(tmp_path):
     assert report["status"] == "failed"
     assert all(stage["status"] == "failed" for stage in report["stages"])
     assert all("model ID does not match" in stage["error"] for stage in report["stages"])
+    assert report["artifacts"] == []
