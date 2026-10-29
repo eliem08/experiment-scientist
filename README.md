@@ -48,15 +48,18 @@ The CLI exports normalized run metadata, manifest warnings, read errors, and dup
 
 ## Unified evaluation workflow
 
-The unified runner currently orchestrates the three local Transformers evaluators in Behavior Bench, Safety Probe Lab, and Experiment Scientist, using the same model ID, device, and generation-token limit. It does not yet orchestrate API-only evaluation or the interpretability/steering tools. Each tool still writes its own native artifact and log; the runner adds a shared workflow ID to each provenance manifest and creates a top-level `workflow.json` plus a self-contained `workflow-report.html` with stage statuses, artifact paths, key metrics, and a consolidated quality gate. A failed stage does not silently disappear: later stages still run, and the workflow exits non-zero.
+The unified runner always executes the three core local evaluators (Behavior Bench, Safety Probe Lab, and Experiment Scientist). It can additionally execute Steering Studio and Neural Flight School when their repository paths are supplied. Each tool keeps its native artifact; the runner links the outputs in `workflow.json` and a self-contained `workflow-report.html`. Optional tools are not silently treated as complete when their paths are omitted. The sixth tool's execution adapter is not yet wired into this runner; the artifact registry remains read-only and can inspect its supported output format if present. A failed stage stays visible, later stages still run, and the quality gate fails.
 
-Clone the three repositories as sibling folders next to `experiment-scientist`. On Windows, `./setup_unified_evaluation.ps1` clones the two sibling repositories if missing, creates `.venv`, and installs the lean runtime dependencies from `requirements-evaluation.txt`. Use `-SkipInstall` to clone only. On macOS/Linux, clone the sibling repositories manually. Then run from this repository:
+Clone the repositories as sibling folders next to `experiment-scientist`. On Windows, `./setup_unified_evaluation.ps1` clones the two core sibling repositories if missing, creates `.venv`, and installs the runtime dependencies from `requirements-evaluation.txt`. Use `-SkipInstall` to clone only. On macOS/Linux, clone the repositories manually. Then run from this repository:
 
     python -m venv .venv
     # Windows PowerShell: .\.venv\Scripts\Activate.ps1
     # macOS/Linux: source .venv/bin/activate
     python -m pip install -r requirements-evaluation.txt
     python unified_evaluation.py --model-id distilgpt2 --device cpu
+
+# Optional research adapters (requires both sibling repositories)
+python unified_evaluation.py --model-id gpt2 --device cpu --steering-studio-dir ../steering-studio --neural-flight-school-dir ../neural-flight-school
 
 On Windows PowerShell, use the same command, or run `./run_unified_evaluation.ps1 --model-id distilgpt2 --device cpu`.
 
