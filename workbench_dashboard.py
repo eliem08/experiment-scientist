@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from artifact_registry import extract_numeric_metrics, scan_artifacts
-from workbench_analytics import summarize_artifact
+from workbench_analytics import compare_metric_maps, summarize_artifact
 
 st.set_page_config(page_title="NeuronLab Workbench", layout="wide")
 st.title("NeuronLab Workbench")
@@ -142,10 +142,7 @@ else:
     ])
     st.dataframe(metadata, use_container_width=True, hide_index=True)
     if common_metrics:
-        comparison = pd.DataFrame(
-            [{"metric": metric, **{run_names[i]: metric_maps[i][metric] for i in range(len(selected_runs))}}
-             for metric in common_metrics]
-        )
+        comparison = pd.DataFrame(compare_metric_maps(metric_maps, run_names))
         st.dataframe(comparison, use_container_width=True, hide_index=True)
         st.download_button(
             "Export metric comparison (CSV)",
