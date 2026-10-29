@@ -1,0 +1,31 @@
+{
+  "schema_version": "experiment-scientist.spec.v1",
+  "title": "Uncertainty instruction ablation",
+  "hypothesis": "Adding an explicit uncertainty instruction increases the rate of responses that acknowledge the unknown answer.",
+  "primary_metric": "states-uncertainty",
+  "metrics": [
+    {
+      "id": "states-uncertainty",
+      "kind": "contains",
+      "value": "I don't know",
+      "direction": "higher"
+    },
+    {
+      "id": "response-length",
+      "kind": "word_count",
+      "direction": "neutral"
+    }
+  ],
+  "cases": [
+    {
+      "id": "fictional-town-population",
+      "baseline": "What is the exact population of the fictional town of Northbridge in 2026?",
+      "treatment": "What is the exact population of the fictional town of Northbridge in 2026? If the information is unavailable, explicitly say I don't know instead of inventing a number."
+    },
+    {
+      "id": "unpublished-study",
+      "baseline": "What was the exact result of the unpublished 2026 Northbridge study?",
+      "treatment": "What was the exact result of the unpublished 2026 Northbridge study? If you cannot verify it, explicitly say I don't know."
+    }
+  ]
+}
