@@ -17,16 +17,23 @@ from typing import Sequence
 from artifact_registry import scan_artifacts
 
 SUMMARY_FIELDS = (
-    "project", "model_id", "run_id", "created_at_utc", "schema_version",
-    "manifest_status", "row_count", "artifact_name", "path",
+    "project", "model_id", "run_id", "workflow_id", "created_at_utc", "schema_version",
+    "manifest_status", "row_count", "artifact_name", "path", "workflow_status", "quality_gate_passed",
 )
 
 
 def build_report(roots: Sequence[str]) -> dict:
     """Return a portable report without embedding raw experiment payloads."""
     result = scan_artifacts(list(roots))
-    artifacts = [{key: item.get(key) for key in SUMMARY_FIELDS} | {"warnings": item["warnings"]}
-                 for item in result["artifacts"]]
+    artifacts = []
+    for item in result["artifacts"]:
+        payload = item.get("payload", {})
+        gate = payload.get("quality_gate") if isinstance(payload, dict) else None
+        artifacts.append({key: item.get(key) for key in SUMMARY_FIELDS} | {
+            "workflow_status": payload.get("status") if payload.get("schema_version") == "neuronlab.workflow.v1" else None,
+            "quality_gate_passed": gate.get("passed") if isinstance(gate, dict) else None,
+            "warnings": item["warnings"],
+        })
     return {
         "contract_version": result["contract_version"],
         "summary": result["summary"],
