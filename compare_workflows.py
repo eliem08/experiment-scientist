@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -93,6 +94,7 @@ def compare_workflows(
 
     return {
         "schema_version": SCHEMA_VERSION,
+        "comparison_id": str(uuid.uuid4()),
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "baseline": {"workflow_id": baseline_id, "model_id": baseline.get("model_id")},
         "candidate": {"workflow_id": candidate_id, "model_id": candidate.get("model_id")},
