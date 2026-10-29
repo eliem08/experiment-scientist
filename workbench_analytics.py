@@ -23,7 +23,20 @@ def summarize_artifact(artifact: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(results, list):
         results = cases if isinstance(cases, list) else []
 
-    if "behavior-bench" in project or "behavior_bench" in project:
+    if "neuronlab-unified-workflow" in project or payload.get("schema_version") == "neuronlab.workflow.v1":
+        stages = payload.get("stages", [])
+        stages = [stage for stage in stages if isinstance(stage, dict)] if isinstance(stages, list) else []
+        gate = payload.get("quality_gate")
+        add("Workflow status", payload.get("status"))
+        add("Stages", len(stages))
+        add("Stages completed", sum(stage.get("status") == "completed" for stage in stages))
+        add("Stages failed", sum(stage.get("status") == "failed" for stage in stages))
+        if isinstance(gate, dict) and gate.get("passed") is not None:
+            add("Unified quality gate", "PASS" if gate["passed"] else "FAIL")
+        blockers = gate.get("blockers", []) if isinstance(gate, dict) else []
+        if blockers:
+            add("Gate blockers", ", ".join(str(item) for item in blockers))
+    elif "behavior-bench" in project or "behavior_bench" in project:
         add("Cases evaluated", summary.get("total", len(results)))
         add("Expected-check pass rate", summary.get("expected_pass_rate"), "Fraction from configured substring checks; not semantic quality.")
         add("Cases with forbidden hits", summary.get("cases_with_forbidden_hits"))
