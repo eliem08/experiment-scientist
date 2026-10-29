@@ -301,3 +301,28 @@ def test_scan_artifacts_discovers_workflow_comparison(tmp_path):
     result = scan_artifacts([tmp_path])
     assert result["summary"]["artifacts"] == 1
     assert result["artifacts"][0]["project"] == "neuronlab-workflow-comparison"
+
+
+
+def test_workbench_summarizes_workflow_comparison_gate_and_deltas():
+    from workbench_analytics import summarize_artifact
+
+    rows = summarize_artifact({
+        "project": "neuronlab-workflow-comparison",
+        "payload": {
+            "schema_version": "neuronlab.workflow-comparison.v1",
+            "baseline": {"model_id": "model-a"},
+            "candidate": {"model_id": "model-b"},
+            "gate": {"passed": False, "blockers": ["expected_pass_rate regressed"]},
+            "comparisons": [
+                {"label": "Behavior pass rate", "stage": "behavior-bench", "direction": "higher", "delta": -0.2},
+                {"label": "Response length", "stage": "experiment-scientist", "direction": "neutral", "delta": 4.0},
+            ],
+        },
+    })
+    values = {row["metric"]: row["value"] for row in rows}
+    assert values["Comparison gate"] == "FAIL"
+    assert values["Baseline model"] == "model-a"
+    assert values["Behavior pass rate delta"] == -0.2
+    assert values["Response length delta"] == 4.0
+    assert "Regression blockers" in values
