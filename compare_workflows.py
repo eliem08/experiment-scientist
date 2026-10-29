@@ -46,10 +46,10 @@ def compare_workflows(
     blockers: list[str] = []
     warnings: list[str] = []
     metric_specs = [
-        ("behavior-bench", "expected_pass_rate", "higher", "Behavior Bench expected pass rate"),
-        ("behavior-bench", "cases_with_forbidden_hits", "lower", "Behavior Bench forbidden-hit cases"),
-        ("safety-probe-lab", "heuristic_signals", "lower", "Safety Probe Lab heuristic signals (triage only)"),
-        ("experiment-scientist", "mean_word_delta", "neutral", "Mean treatment-minus-baseline word delta (descriptive only)"),
+        ("behavior_bench", "expected_pass_rate", "higher", "Behavior Bench expected pass rate"),
+        ("behavior_bench", "cases_with_forbidden_hits", "lower", "Behavior Bench forbidden-hit cases"),
+        ("safety_probe_lab", "heuristic_signals", "lower", "Safety Probe Lab heuristic signals (triage only)"),
+        ("experiment_scientist", "mean_word_delta", "neutral", "Mean treatment-minus-baseline word delta (descriptive only)"),
     ]
     for stage_name, metric, direction, label in metric_specs:
         old = _stage_metrics(baseline, stage_name).get(metric)
@@ -73,7 +73,7 @@ def compare_workflows(
             item["regression"] = None
             if old is not None or new is not None:
                 warnings.append(f"Cannot compare {stage_name}.{metric}: numeric metric missing from baseline or candidate.")
-            if stage_name == "behavior-bench" and metric in {"expected_pass_rate", "cases_with_forbidden_hits"}:
+            if stage_name == "behavior_bench" and metric in {"expected_pass_rate", "cases_with_forbidden_hits"}:
                 blockers.append(f"{metric}: required regression metric is missing or non-numeric; refusing to pass the comparison gate.")
         comparisons.append(item)
 
