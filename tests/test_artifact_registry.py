@@ -52,3 +52,22 @@ def test_scan_reports_missing_root_and_deduplicates_same_path(tmp_path):
     result = scan_artifacts([tmp_path, path, tmp_path / "missing"])
     assert result["summary"]["artifacts"] == 1
     assert result["summary"]["read_errors"] == 1
+
+
+def test_extract_numeric_metrics_reads_nested_scalars_and_skips_manifest():
+    from artifact_registry import extract_numeric_metrics
+
+    metrics = extract_numeric_metrics({
+        "manifest": {"seed": 17, "schema_version": CONTRACT_VERSION},
+        "summary": {"pass_rate": 0.75, "count": 4, "enabled": True},
+        "model": {"latency": 12.5},
+        "cases": [{"score": 1.0}],
+    })
+    assert metrics == {"summary.pass_rate": 0.75, "summary.count": 4, "model.latency": 12.5}
+
+
+def test_extract_numeric_metrics_is_bounded():
+    from artifact_registry import extract_numeric_metrics
+
+    metrics = extract_numeric_metrics({f"metric_{i}": i for i in range(20)}, max_metrics=5)
+    assert len(metrics) == 5
