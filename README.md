@@ -44,3 +44,22 @@ You can scan artifacts without launching Streamlit, which is useful for automati
     python workbench_cli.py outputs --format json --output scan-report.json
 
 The CLI exports normalized run metadata, manifest warnings, read errors, and duplicate run IDs without copying full model responses into the report. It uses the Python standard library only. It exits with status 1 if any artifact could not be read, making it suitable for a basic pipeline quality check.
+
+
+## Unified evaluation workflow
+
+The unified runner orchestrates the local model evaluators in Behavior Bench, Safety Probe Lab, and Experiment Scientist, using the same model ID, device, and generation-token limit. Each tool still writes its own native artifact and log; the runner adds a shared workflow ID to each provenance manifest and creates a top-level `workflow.json` with stage statuses, artifact paths, key metrics, and a consolidated quality gate. A failed stage does not silently disappear: later stages still run, and the workflow exits non-zero.
+
+Clone the three repositories as sibling folders next to `experiment-scientist`, install the model-tool requirements in each repository, then run from this repository:
+
+    python unified_evaluation.py --model-id distilgpt2 --device cpu
+
+To customize paths or output:
+
+    python unified_evaluation.py --behavior-bench-dir ../behavior-bench --safety-probe-dir ../safety-probe-lab --experiment-scientist-dir . --model-id distilgpt2 --device auto --output outputs/unified-evaluation
+
+The default case suite is `behavior-bench/examples/cases.jsonl`. Model weights may need to be downloaded on the first run, and the workflow can take a while on CPU. The default stage timeout is two hours; change it with `--timeout-seconds`.
+
+The unified quality gate fails if any stage fails or if Behavior Bench's configured regression gate fails. Safety Probe Lab's marker signals are shown as heuristic triage, not as a validated safety score; Experiment Scientist's word deltas are descriptive response-length differences, not measures of answer quality. The workflow does not claim a model is safe or correct simply because its stages completed.
+
+The top-level `workflow.json` is also recognized by the Workbench run-history registry. Point `workbench_dashboard.py` at the workflow output directory to inspect the unified workflow alongside individual run artifacts.
