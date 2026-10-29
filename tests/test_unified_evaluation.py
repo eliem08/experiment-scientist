@@ -87,6 +87,10 @@ def test_unified_workflow_runs_all_stages_with_shared_workflow_id(tmp_path):
     assert "NeuronLab Unified Evaluation" in html_report
     assert "PASS" in html_report
     assert len(saved["artifacts"]) == 3
+    assert saved["summary"]["stages_completed"] == 3
+    assert saved["summary"]["behavior_bench"]["expected_pass_rate"] == 1.0
+    assert saved["summary"]["safety_probe_lab"]["heuristic_signals"] == 1
+    assert saved["summary"]["experiment_scientist"]["mean_word_delta"] == 2.0
 
 
 def test_unified_workflow_fails_gate_if_behavior_quality_gate_fails(tmp_path):
