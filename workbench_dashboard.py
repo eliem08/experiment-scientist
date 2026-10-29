@@ -110,6 +110,7 @@ if artifact["project"] == "neuronlab-unified-workflow":
             "workflow_id": stage.get("manifest_workflow_id"),
             "duration_seconds": stage.get("duration_seconds"),
             "artifact": stage.get("artifact"),
+            "note": stage.get("note", ""),
             "error": stage.get("error", ""),
         })
     if stage_rows:
