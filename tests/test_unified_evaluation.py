@@ -20,7 +20,7 @@ def _make_repositories(tmp_path):
     return behavior, safety, experiment, cases
 
 
-def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=None):
+def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=None, model_id_override=None):
     def run(command, *, cwd, env, capture_output, text, timeout, check):
         script = Path(command[1]).name
         stage_by_script = {
@@ -33,9 +33,13 @@ def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=No
             return SimpleNamespace(returncode=2, stdout="", stderr="fixture failure")
         output = Path(command[command.index("--output") + 1])
         output.mkdir(parents=True, exist_ok=True)
+        requested_model = command[command.index("--model-id") + 1]
+        artifact_model = model_id_override or requested_model
         payload = {
+            "model_id": artifact_model,
             "manifest": {
                 "project": project,
+                "model_id": artifact_model,
                 "run_id": f"{project}-run",
                 "workflow_id": workflow_id_override or env["NEURONLAB_WORKFLOW_ID"],
                 "workflow_schema_version": env["NEURONLAB_WORKFLOW_SCHEMA"],
@@ -132,3 +136,15 @@ def test_unified_workflow_rejects_stale_artifacts_with_wrong_workflow_id(tmp_pat
     assert report["quality_gate"]["passed"] is False
     assert all(stage["status"] == "failed" for stage in report["stages"])
     assert all("does not match" in stage["error"] for stage in report["stages"])
+
+
+def test_unified_workflow_rejects_mixed_model_artifacts(tmp_path):
+    behavior, safety, experiment, cases = _make_repositories(tmp_path)
+    report = run_workflow(
+        behavior_dir=behavior, safety_dir=safety, experiment_dir=experiment,
+        model_id="requested-model", cases=cases, output_root=tmp_path / "outputs",
+        runner=_fake_runner(model_id_override="different-model"),
+    )
+    assert report["status"] == "failed"
+    assert all(stage["status"] == "failed" for stage in report["stages"])
+    assert all("model ID does not match" in stage["error"] for stage in report["stages"])
