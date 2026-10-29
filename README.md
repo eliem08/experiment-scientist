@@ -61,7 +61,7 @@ Clone the repositories as sibling folders next to `experiment-scientist`. On Win
 # Optional research adapters (requires both sibling repositories)
 python unified_evaluation.py --model-id gpt2 --device cpu --steering-studio-dir ../steering-studio --neural-flight-school-dir ../neural-flight-school
 
-On Windows PowerShell, use the same command, or run `./run_unified_evaluation.ps1 --model-id distilgpt2 --device cpu`.
+On Windows PowerShell, use the same command, or run `./run_unified_evaluation.ps1 --model-id distilgpt2 --device cpu`. Steering Studio defaults to transformer layer 6; use `--steering-layer 1` for small GPT-2 variants that have fewer layers.
 
 To customize paths or output:
 
@@ -89,4 +89,4 @@ Safety Probe Lab heuristic counts and Experiment Scientist response-length delta
 
 ### Real-model smoke run in GitHub Actions
 
-The manual workflow [`unified-smoke.yml`](.github/workflows/unified-smoke.yml) runs all three evaluators against an actual Hugging Face model on CPU, validates that every stage completed, and uploads the JSON/HTML report plus logs as a workflow artifact. To run it, open the repository's **Actions** tab, select **unified-evaluation-smoke**, click **Run workflow**, and keep the default `sshleifer/tiny-gpt2` model for the smallest initial download. The regression/quality gate may legitimately fail on a tiny model; the smoke check distinguishes that from an evaluator execution failure. This manual run has to be triggered from GitHub and has not been claimed as completed until its artifact is available.
+The manual workflow [`unified-smoke.yml`](.github/workflows/unified-smoke.yml) runs all five executable stages against an actual Hugging Face model on CPU, validates that every stage completed, and uploads the JSON/HTML report plus logs as a workflow artifact. It checks out Steering Studio and Neural Flight School as well as the three core repositories. To run it, open the repository's **Actions** tab, select **unified-evaluation-smoke**, click **Run workflow**, and keep the default `sshleifer/tiny-gpt2` model for the smallest initial download. The regression/quality gate may legitimately fail on a tiny model; the smoke check distinguishes that from an evaluator execution failure. This manual run has to be triggered from GitHub and has not been claimed as completed until its artifact is available.
