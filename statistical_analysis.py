@@ -41,6 +41,11 @@ def paired_unit_deltas(
         group = groups[pair_id]
         if not group["baseline"] or not group["treatment"]:
             raise ValueError(f"pair {pair_id!r} is missing an arm")
+        if len(group["baseline"]) != len(group["treatment"]):
+            raise ValueError(
+                f"pair {pair_id!r} has unbalanced repeats: "
+                f"{len(group['baseline'])} baseline vs {len(group['treatment'])} treatment"
+            )
         baseline_mean = statistics.fmean(group["baseline"])
         treatment_mean = statistics.fmean(group["treatment"])
         result.append({
