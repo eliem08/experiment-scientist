@@ -224,6 +224,7 @@ def test_cli_includes_unified_workflow_status_and_gate_in_export(tmp_path, capsy
         "model_id": "toy-model",
         "status": "failed",
         "quality_gate": {"passed": False, "blockers": ["safety-probe-lab"]},
+        "html_report_path": "/tmp/workflow-report.html",
         "stages": [],
     }), encoding="utf-8")
     assert main([str(path)]) == 0
@@ -232,3 +233,4 @@ def test_cli_includes_unified_workflow_status_and_gate_in_export(tmp_path, capsy
     assert item["workflow_id"] == "workflow-cli-test"
     assert item["workflow_status"] == "failed"
     assert item["quality_gate_passed"] is False
+    assert item["html_report_path"] == "/tmp/workflow-report.html"
