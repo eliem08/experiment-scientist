@@ -56,3 +56,13 @@ def test_holm_adjustment_is_monotonic_and_preserves_keys():
     assert adjusted == {"a": 0.03, "b": 0.06, "c": 0.06}
     with pytest.raises(ValueError, match="p-value"):
         holm_adjust({"bad": 1.1})
+
+
+def test_unbalanced_repeat_counts_are_rejected_instead_of_silently_averaged():
+    rows = [
+        {"case_id": "x", "baseline_score": 1, "treatment_score": 2},
+        {"case_id": "x", "baseline_score": 2, "treatment_score": 3},
+        {"case_id": "x", "baseline_score": 3, "treatment_score": 4},
+    ]
+    with pytest.raises(ValueError, match="unbalanced repeats"):
+        paired_unit_deltas(rows)
