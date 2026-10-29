@@ -72,6 +72,7 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
         "project": manifest.get("project") or payload.get("project") or "unknown",
         "model_id": payload.get("model_id") or payload.get("model") or manifest.get("model_id") or "unknown",
         "run_id": manifest.get("run_id"),
+        "workflow_id": manifest.get("workflow_id") or (payload.get("workflow_id") if is_workflow else None),
         "created_at_utc": manifest.get("created_at_utc"),
         "schema_version": manifest.get("schema_version"),
         "manifest_status": status,
