@@ -132,6 +132,7 @@ def render_workflow_html(report: dict[str, Any], path: Path) -> None:
             stage.get("artifact_model_id", ""),
             stage.get("artifact_device", ""),
             stage.get("manifest_workflow_id", ""),
+            stage.get("note", ""),
             stage.get("error", ""),
         ]
         rows.append(
@@ -141,7 +142,7 @@ def render_workflow_html(report: dict[str, Any], path: Path) -> None:
     gate = report.get("quality_gate", {})
     gate_status = "PASS" if gate.get("passed") is True else "FAIL"
     blockers = ", ".join(str(value) for value in gate.get("blockers", [])) or "None"
-    stage_rows = "\n".join(rows) or '<tr><td colspan="9">No stages recorded.</td></tr>'
+    stage_rows = "\n".join(rows) or '<tr><td colspan="10">No stages recorded.</td></tr>'
     document = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -169,7 +170,7 @@ small{{color:#4b5563}}
 </div>
 <h2>Stage results</h2>
 <table>
-<thead><tr><th>Stage</th><th>Status</th><th>Exit code</th><th>Seconds</th><th>Model ID</th><th>Resolved device</th><th>Workflow ID</th><th>Error</th><th>Metrics</th></tr></thead>
+<thead><tr><th>Stage</th><th>Status</th><th>Exit code</th><th>Seconds</th><th>Model ID</th><th>Resolved device</th><th>Workflow ID</th><th>Note</th><th>Error</th><th>Metrics</th></tr></thead>
 <tbody>{stage_rows}</tbody>
 </table>
 <h2>Interpretation limits</h2>
