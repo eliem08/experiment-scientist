@@ -24,6 +24,8 @@ def build_manifest(project: str, *, model_id=None, device=None, seed=None, confi
     return {
         "schema_version": "neuronlab.run.v1",
         "run_id": str(uuid.uuid4()),
+        "workflow_id": os.environ.get("NEURONLAB_WORKFLOW_ID"),
+        "workflow_schema_version": os.environ.get("NEURONLAB_WORKFLOW_SCHEMA"),
         "project": project,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "python_version": sys.version.split()[0],
