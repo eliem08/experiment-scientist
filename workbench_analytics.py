@@ -64,3 +64,21 @@ def summarize_artifact(artifact: dict[str, Any]) -> list[dict[str, Any]]:
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 add(key.replace("_", " ").title(), value)
     return metrics
+
+
+def compare_metric_maps(metric_maps: list[dict[str, int | float]], run_names: list[str]) -> list[dict[str, Any]]:
+    """Build a common-metric comparison with absolute deltas versus the first run."""
+    if len(metric_maps) != len(run_names) or len(metric_maps) < 2:
+        return []
+    common = sorted(set.intersection(*(set(metrics) for metrics in metric_maps)))
+    rows = []
+    baseline_name = run_names[0]
+    for metric in common:
+        row: dict[str, Any] = {"metric": metric}
+        values = [mapping[metric] for mapping in metric_maps]
+        row[baseline_name] = values[0]
+        for index in range(1, len(metric_maps)):
+            row[run_names[index]] = values[index]
+            row[f"delta vs {baseline_name} ({run_names[index]})"] = values[index] - values[0]
+        rows.append(row)
+    return rows
