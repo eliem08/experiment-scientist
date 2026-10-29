@@ -67,6 +67,10 @@ def compare_workflows(
         elif metric == "cases_with_forbidden_hits":
             valid_old = valid_old and isinstance(old, int) and old >= 0
             valid_new = valid_new and isinstance(new, int) and new >= 0
+        if not valid_old:
+            item["baseline"] = None
+        if not valid_new:
+            item["candidate"] = None
         if valid_old and valid_new:
             item["delta"] = new - old
             if direction == "higher" and new < old - max_pass_rate_drop:
