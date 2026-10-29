@@ -95,6 +95,24 @@ st.json({key: artifact[key] for key in ("project", "model_id", "run_id", "create
 with st.expander("Raw JSON artifact"):
     st.code(json.dumps(artifact["payload"], indent=2, ensure_ascii=False), language="json")
 
+st.subheader("Project-aware scorecards")
+st.caption("Metrics are interpreted only where the source artifact has a known structure. Heuristic safety signals and substring checks are not certifications.")
+scorecard_rows = []
+for item in visible:
+    for metric in summarize_artifact(item):
+        scorecard_rows.append({
+            "project": item["project"],
+            "model_id": item["model_id"],
+            "run_id": item["run_id"] or item["artifact_name"],
+            "metric": metric["metric"],
+            "value": metric["value"],
+            "interpretation": metric["note"],
+        })
+if scorecard_rows:
+    st.dataframe(pd.DataFrame(scorecard_rows), use_container_width=True, hide_index=True)
+else:
+    st.info("No project-specific scorecard fields found in the selected artifacts.")
+
 st.subheader("Cross-run comparison")
 st.caption("Choose two or more artifacts. Only numeric scalar fields with matching dotted paths are compared; row-level data is not coerced into a shared schema.")
 compare_labels = st.multiselect(
