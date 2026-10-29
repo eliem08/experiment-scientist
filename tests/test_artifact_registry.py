@@ -191,3 +191,23 @@ def test_registry_recognizes_unified_workflow_reports(tmp_path):
     assert item["run_id"] == "workflow-123"
     assert item["schema_version"] == "neuronlab.workflow.v1"
     assert item["row_count"] == 2
+
+
+def test_project_summaries_surface_unified_workflow_gate_and_stage_failures():
+    from workbench_analytics import summarize_artifact
+
+    artifact = {
+        "project": "neuronlab-unified-workflow",
+        "payload": {
+            "schema_version": "neuronlab.workflow.v1",
+            "status": "failed",
+            "stages": [{"status": "completed"}, {"status": "failed"}],
+            "quality_gate": {"passed": False, "blockers": ["safety-probe-lab"]},
+        },
+    }
+    metrics = {row["metric"]: row["value"] for row in summarize_artifact(artifact)}
+    assert metrics["Workflow status"] == "failed"
+    assert metrics["Stages completed"] == 1
+    assert metrics["Stages failed"] == 1
+    assert metrics["Unified quality gate"] == "FAIL"
+    assert metrics["Gate blockers"] == "safety-probe-lab"
