@@ -141,6 +141,23 @@ def render_workflow_html(report: dict[str, Any], path: Path) -> None:
             "<tr>" + "".join(f"<td>{html.escape(str(value))}</td>" for value in cells)
             + f"<td><pre>{metrics}</pre></td></tr>"
         )
+    reproducibility = report.get("reproducibility", {})
+    case_suite = reproducibility.get("case_suite", {}) if isinstance(reproducibility, dict) else {}
+    runner_scripts = reproducibility.get("runner_scripts", {}) if isinstance(reproducibility, dict) else {}
+    fingerprint_rows = []
+    if isinstance(case_suite, dict) and case_suite:
+        fingerprint_rows.append(
+            "<tr><td>case suite</td><td>" + html.escape(str(case_suite.get("path", "")))
+            + "</td><td><code>" + html.escape(str(case_suite.get("sha256", ""))) + "</code></td></tr>"
+        )
+    if isinstance(runner_scripts, dict):
+        for name, details in sorted(runner_scripts.items()):
+            if isinstance(details, dict):
+                fingerprint_rows.append(
+                    "<tr><td>" + html.escape(str(name)) + "</td><td>" + html.escape(str(details.get("path", "")))
+                    + "</td><td><code>" + html.escape(str(details.get("sha256", ""))) + "</code></td></tr>"
+                )
+    fingerprint_table = "\\n".join(fingerprint_rows) or '<tr><td colspan="3">No fingerprints recorded.</td></tr>'
     gate = report.get("quality_gate", {})
     gate_status = "PASS" if gate.get("passed") is True else "FAIL"
     blockers = ", ".join(str(value) for value in gate.get("blockers", [])) or "None"
