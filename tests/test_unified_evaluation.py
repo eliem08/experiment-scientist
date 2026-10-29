@@ -93,6 +93,14 @@ def test_unified_workflow_runs_all_stages_with_shared_workflow_id(tmp_path):
     assert saved["summary"]["behavior_bench"]["expected_pass_rate"] == 1.0
     assert saved["summary"]["safety_probe_lab"]["heuristic_signals"] == 1
     assert saved["summary"]["experiment_scientist"]["mean_word_delta"] == 2.0
+    fingerprints = saved["reproducibility"]
+    assert fingerprints["python_version"]
+    assert len(fingerprints["case_suite"]["sha256"]) == 64
+    assert fingerprints["case_suite"]["size_bytes"] > 0
+    assert set(fingerprints["runner_scripts"]) == {
+        "behavior-bench", "safety-probe-lab", "experiment-scientist"
+    }
+    assert all(len(item["sha256"]) == 64 for item in fingerprints["runner_scripts"].values())
 
 
 def test_unified_workflow_fails_gate_if_behavior_quality_gate_fails(tmp_path):
