@@ -207,8 +207,8 @@ def run_workflow(
         "artifacts": [stage["artifact"] for stage in stages if Path(stage["artifact"]).is_file()],
     }
     report_path = output_root / "workflow.json"
-    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     report["report_path"] = str(report_path)
+    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return report
 
 
