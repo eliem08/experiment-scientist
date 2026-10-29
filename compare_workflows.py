@@ -80,6 +80,10 @@ def compare_workflows(
         warnings.append("Baseline and candidate share a workflow_id; verify that distinct runs were intended.")
     if baseline.get("config") != candidate.get("config"):
         warnings.append("Workflow configurations differ; metric changes may be confounded by settings.")
+    baseline_case_hash = baseline.get("reproducibility", {}).get("case_suite", {}).get("sha256")
+    candidate_case_hash = candidate.get("reproducibility", {}).get("case_suite", {}).get("sha256")
+    if baseline_case_hash and candidate_case_hash and baseline_case_hash != candidate_case_hash:
+        warnings.append("Case-suite SHA-256 fingerprints differ; results are not a strict same-suite comparison.")
     if baseline.get("model_id") != candidate.get("model_id"):
         warnings.append("Model IDs differ; this is a model comparison, not a controlled same-model regression check.")
     if baseline.get("quality_gate", {}).get("passed") is not True:
