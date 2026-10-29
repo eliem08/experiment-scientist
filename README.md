@@ -76,7 +76,7 @@ The top-level `workflow.json` is also recognized by the Workbench run-history re
 After running the workflow for a baseline model or revision, keep its `workflow.json` and compare a candidate workflow against it:
 
 ```powershell
-python compare_workflows.py --baseline outputs/baseline/workflow.json --candidate outputs/unified-evaluation/workflow.json --output outputs/comparison.json
+python compare_workflows.py --baseline outputs/baseline/workflow.json --candidate outputs/unified-evaluation/workflow.json --output outputs/workflow-comparison.json
 ```
 
 The comparison report includes metric deltas, configuration/model mismatch warnings, and a regression gate. By default, it blocks an expected-pass-rate drop greater than 5 percentage points or any increase in Behavior Bench cases with forbidden-marker hits. Tune thresholds explicitly with `--max-pass-rate-drop 0.02` and `--max-forbidden-hit-increase 1`. It exits non-zero when a configured regression is detected or the candidate workflow's own quality gate failed.
