@@ -82,3 +82,8 @@ python compare_workflows.py --baseline outputs/baseline/workflow.json --candidat
 The comparison report includes metric deltas, configuration/model mismatch warnings, and a regression gate. By default, it blocks an expected-pass-rate drop greater than 5 percentage points or any increase in Behavior Bench cases with forbidden-marker hits. Tune thresholds explicitly with `--max-pass-rate-drop 0.02` and `--max-forbidden-hit-increase 1`. It exits non-zero when a configured regression is detected or the candidate workflow's own quality gate failed.
 
 Safety Probe Lab heuristic counts and Experiment Scientist response-length deltas are diagnostics only; they do not affect the regression gate. Keep baseline and candidate case suites and metric definitions comparable. This is an engineering regression signal, not a certification of correctness or safety. Regression comparisons are tested with synthetic fixtures in CI; run actual local model inference before relying on results.
+
+
+### Real-model smoke run in GitHub Actions
+
+The manual workflow [`unified-smoke.yml`](.github/workflows/unified-smoke.yml) runs all three evaluators against an actual Hugging Face model on CPU, validates that every stage completed, and uploads the JSON/HTML report plus logs as a workflow artifact. To run it, open the repository's **Actions** tab, select **unified-evaluation-smoke**, click **Run workflow**, and keep the default `sshleifer/tiny-gpt2` model for the smallest initial download. The regression/quality gate may legitimately fail on a tiny model; the smoke check distinguishes that from an evaluator execution failure. This manual run has to be triggered from GitHub and has not been claimed as completed until its artifact is available.
