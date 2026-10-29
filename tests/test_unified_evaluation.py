@@ -20,7 +20,7 @@ def _make_repositories(tmp_path):
     return behavior, safety, experiment, cases
 
 
-def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=None, model_id_override=None, nonzero_on_behavior_gate=False):
+def _fake_runner(*, behavior_gate=True, behavior_pass_rate=1.0, fail_stage=None, workflow_id_override=None, model_id_override=None, nonzero_on_behavior_gate=False):
     def run(command, *, cwd, env, capture_output, text, timeout, check):
         script = Path(command[1]).name
         stage_by_script = {
@@ -49,7 +49,7 @@ def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=No
         if project == "behavior-bench":
             payload.update({
                 "cases": [{"id": "case-1"}],
-                "summary": {"total": 1, "expected_pass_rate": 1.0, "cases_with_forbidden_hits": 0},
+                "summary": {"total": 1, "expected_pass_rate": behavior_pass_rate, "cases_with_forbidden_hits": 0},
                 "quality_gate": {"passed": behavior_gate},
             })
         elif project == "safety-probe-lab":
@@ -223,3 +223,25 @@ def test_expected_behavior_gate_exit_retains_valid_artifact_without_marking_stag
     assert report["status"] == "completed"
     assert report["quality_gate"]["passed"] is False
     assert len(report["artifacts"]) == 3
+
+
+
+def test_generated_workflow_reports_feed_regression_comparator(tmp_path):
+    from compare_workflows import compare_workflows
+
+    behavior, safety, experiment, cases = _make_repositories(tmp_path)
+    baseline = run_workflow(
+        behavior_dir=behavior, safety_dir=safety, experiment_dir=experiment,
+        model_id="toy-model", cases=cases, output_root=tmp_path / "baseline",
+        device="cpu", runner=_fake_runner(behavior_pass_rate=0.95),
+    )
+    candidate = run_workflow(
+        behavior_dir=behavior, safety_dir=safety, experiment_dir=experiment,
+        model_id="toy-model", cases=cases, output_root=tmp_path / "candidate",
+        device="cpu", runner=_fake_runner(behavior_pass_rate=0.80),
+    )
+    comparison = compare_workflows(baseline, candidate)
+    assert comparison["gate"]["passed"] is False
+    assert any("expected_pass_rate" in blocker for blocker in comparison["gate"]["blockers"])
+    assert comparison["baseline"]["workflow_id"] == baseline["workflow_id"]
+    assert comparison["candidate"]["workflow_id"] == candidate["workflow_id"]
