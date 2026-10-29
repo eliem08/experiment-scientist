@@ -1,17 +1,19 @@
 # Six-Tool Orchestration: Implementation Contract
 
-**Status:** design contract for the next implementation slice  
+**Status:** phased implementation; five tools have executable adapters, the sixth is artifact-import only  
 **Target:** extend the existing unified evaluation workflow without weakening its current provenance, failure-reporting, or quality-gate behavior.
 
 ## Current verified baseline
 
-The current `unified_evaluation.py` workflow executes three local Transformers evaluators:
+The current `unified_evaluation.py` workflow always executes three local evaluators and can optionally execute two more:
 
 1. Behavior Bench
 2. Safety Probe Lab
 3. Experiment Scientist
+4. Steering Studio (optional, `--steering-studio-dir`)
+5. Neural Flight School (optional, `--neural-flight-school-dir`)
 
-The Workbench artifact registry can inspect artifacts from all six NeuronLab tools, but artifact discovery is not the same as executing all six tools. The existing workflow contract must remain backward-compatible while execution coverage expands.
+The Workbench also imports precomputed Neuron Explorer `depth_report.json` files. Neuron Explorer's main workflow is a GPU-backed interactive/sweep system, not a simple one-shot evaluator, so it is intentionally not launched automatically. This is six-tool artifact-history coverage, not six automatic model executions.
 
 ## Goals
 
@@ -48,14 +50,15 @@ Use a finite status vocabulary: `pending`, `running`, `completed`, `failed`, `ti
 
 **Acceptance:** unit tests cover valid configuration, missing paths, invalid stage names, duplicate stage names, and API stages disabled by default.
 
-### Phase 2 — remaining local tools
+### Phase 2 — local tool adapters (partially complete)
 
-- Identify the exact remaining tool repositories and their documented invocation/artifact contracts before implementing adapters.
-- Add one adapter per tool; do not assume every tool is a Transformers evaluator.
+- Completed: Steering Studio and Neural Flight School adapters, with native output preservation and synthetic tests.
+- Completed: read-only import of precomputed Neuron Explorer depth reports.
+- Remaining: validate real end-to-end execution against each external repository in an environment with its dependencies and, for Neuron Explorer, its GPU/run data.
 - Preserve each tool's native artifact and add a small normalized stage summary only.
 - Add synthetic-fixture tests for success, non-zero exit, missing artifact, malformed JSON, timeout, and workflow-ID mismatch.
 
-**Acceptance:** a six-stage run lists all six configured tools. A tool that is not installed is explicitly unavailable and causes the configured gate to fail unless the user explicitly selected a partial run.
+**Acceptance:** five runnable stages can be invoked in one workflow when optional repositories are provided; the sixth tool's precomputed depth report can be discovered by the Workbench. This does not claim an automatic six-stage inference run.
 
 ### Phase 3 — API-backed integration
 
@@ -83,6 +86,6 @@ Use a finite status vocabulary: `pending`, `running`, `completed`, `failed`, `ti
 - No hard-coded secrets or automatic API execution.
 - No speculative adapters for unidentified repositories.
 
-## Immediate next action
+## Remaining verification
 
-Inspect the remaining three repositories and record each one's real command, dependency set, output artifact, and provenance support. Then implement and test adapters individually before enabling a six-stage default run.
+Run the new GitHub Actions tests and perform real-model smoke tests for the five runnable adapters. Verify Neuron Explorer imports against a real `depth_report.json`. Do not enable automatic GPU sweeps or API-backed evaluation by default.
