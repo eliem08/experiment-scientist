@@ -172,3 +172,22 @@ def test_compare_metric_maps_requires_two_runs():
     from workbench_analytics import compare_metric_maps
 
     assert compare_metric_maps([{"x": 1}], ["only"]) == []
+
+
+def test_registry_recognizes_unified_workflow_reports(tmp_path):
+    path = tmp_path / "workflow.json"
+    path.write_text(json.dumps({
+        "schema_version": "neuronlab.workflow.v1",
+        "workflow_id": "workflow-123",
+        "created_at_utc": "2026-10-29T10:00:00+00:00",
+        "model_id": "toy-model",
+        "status": "completed",
+        "quality_gate": {"passed": True, "blockers": []},
+        "stages": [{"name": "behavior-bench"}, {"name": "safety-probe-lab"}],
+    }), encoding="utf-8")
+    item = inspect_artifact(path)
+    assert item["manifest_status"] == "valid"
+    assert item["project"] == "neuronlab-unified-workflow"
+    assert item["run_id"] == "workflow-123"
+    assert item["schema_version"] == "neuronlab.workflow.v1"
+    assert item["row_count"] == 2
