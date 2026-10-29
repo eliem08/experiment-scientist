@@ -17,7 +17,8 @@ A workflow is one invocation of `unified_evaluation.py`. It is separate from eac
 | `quality_gate` | `passed` plus a list of blocking stage or regression-gate names |
 | `stages` | Ordered stage execution records |
 | `artifacts` | Paths to result files that exist |
-| `report_path` | Path to the saved workflow report |
+| `report_path` | Path to the saved workflow JSON report |
+| `html_report_path` | Path to the self-contained human-readable HTML report |
 
 ## Stage contract
 
@@ -35,7 +36,7 @@ The unified gate fails if any stage fails or if Behavior Bench reports its confi
 
 ## Provenance
 
-The orchestrator sets `NEURONLAB_WORKFLOW_ID` and `NEURONLAB_WORKFLOW_SCHEMA` in each child process. The three built-in tools copy these into their manifests while retaining unique run IDs. Standalone invocations leave workflow fields empty.
+The orchestrator sets `NEURONLAB_WORKFLOW_ID` and `NEURONLAB_WORKFLOW_SCHEMA` in each child process. It also checks that every result's workflow ID and model ID match the current invocation before counting the artifact as successful. The three built-in tools copy these into their manifests while retaining unique run IDs. Standalone invocations leave workflow fields empty.
 
 ## Data and security
 
