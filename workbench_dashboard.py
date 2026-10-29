@@ -75,6 +75,7 @@ table_rows = [{
     "model_id": a["model_id"],
     "created_at_utc": a["created_at_utc"] or "unknown",
     "run_id": a["run_id"] or "missing",
+    "workflow_id": a.get("workflow_id") or "",
     "manifest": a["manifest_status"],
     "rows": a["row_count"],
     "file": a["artifact_name"],
