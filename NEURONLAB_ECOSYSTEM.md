@@ -11,13 +11,16 @@ These repositories are separate, composable tools intended to evolve into one lo
 - [Steering Studio](https://github.com/eliem08/steering-studio) — test controlled activation interventions.
 - [Neural Flight School](https://github.com/eliem08/neural-flight-school) — teach transformer internals through interactive visualizations.
 
-## Shared contract
+## Shared run contract
 
-Each module should save:
-1. Raw inputs and model outputs.
-2. A JSON/CSV result artifact.
-3. A manifest with model ID, device, run timestamp, package versions, config, and hashes of relevant inputs.
-4. A warning that distinguishes exploratory diagnostics from validated evaluation.
+Every module's JSON artifact includes a `manifest` using schema version `neuronlab.run.v1`. The shared manifest fields are:
+- `schema_version`: contract version (`neuronlab.run.v1`).
+- `run_id`: unique UUID for this execution.
+- `project`, `created_at_utc`, `git_commit`, `python_version`, and `platform`.
+- `model_id`, `device`, and `seed` when applicable.
+- `package_versions`, `config`, and `input_sha256` for reproducibility.
+
+Each module also saves raw inputs and model outputs where appropriate, JSON/CSV result artifacts, and a warning that distinguishes exploratory diagnostics from validated evaluation. Module-specific result rows may differ, but consumers can reliably identify the run and read provenance from the shared manifest. Contract changes should increment the schema version rather than silently changing the meaning of existing fields.
 
 ## Final integrated product: NeuronLab Workbench
 
