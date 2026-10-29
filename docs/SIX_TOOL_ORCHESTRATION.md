@@ -54,7 +54,7 @@ Use a finite status vocabulary: `pending`, `running`, `completed`, `failed`, `ti
 
 - Completed: Steering Studio and Neural Flight School adapters, with native output preservation and synthetic tests.
 - Completed: read-only import of precomputed Neuron Explorer depth reports.
-- A manual GitHub Actions smoke workflow now checks out the four sibling tool repositories, runs the five executable stages on a real Hugging Face model, and uploads the workflow report and native artifacts. Trigger it from Actions to validate end-to-end execution in GitHub's runner.
+- A GitHub Actions smoke workflow now runs on pull requests (and can also be started manually), checks out the four sibling tool repositories, runs the five executable stages on a real Hugging Face model, and uploads the workflow report and native artifacts.
 - Neuron Explorer remains a read-only import because its GPU-backed sweep is a separate workflow; validate import with a real `depth_report.json` when one is available.
 - Preserve each tool's native artifact and add a small normalized stage summary only.
 - Add synthetic-fixture tests for success, non-zero exit, missing artifact, malformed JSON, timeout, and workflow-ID mismatch.
@@ -89,4 +89,4 @@ Use a finite status vocabulary: `pending`, `running`, `completed`, `failed`, `ti
 
 ## Remaining verification
 
-GitHub Actions unit tests have passed on the previous implementation commit; confirm the newest run after this change. Trigger the manual five-tool real-model smoke workflow before calling the integration end-to-end validated. Verify Neuron Explorer imports against a real `depth_report.json`. Do not enable automatic GPU sweeps or API-backed evaluation by default.
+GitHub Actions unit tests have passed on the previous implementation commit; confirm the newest run after this change. Confirm the pull-request five-tool real-model smoke workflow passes before calling the integration end-to-end validated. Verify Neuron Explorer imports against a real `depth_report.json`. Do not enable automatic GPU sweeps or API-backed evaluation by default.
