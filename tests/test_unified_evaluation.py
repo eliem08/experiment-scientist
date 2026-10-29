@@ -20,7 +20,7 @@ def _make_repositories(tmp_path):
     return behavior, safety, experiment, cases
 
 
-def _fake_runner(*, behavior_gate=True, fail_stage=None):
+def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=None):
     def run(command, *, cwd, env, capture_output, text, timeout, check):
         script = Path(command[1]).name
         stage_by_script = {
@@ -37,7 +37,7 @@ def _fake_runner(*, behavior_gate=True, fail_stage=None):
             "manifest": {
                 "project": project,
                 "run_id": f"{project}-run",
-                "workflow_id": env["NEURONLAB_WORKFLOW_ID"],
+                "workflow_id": workflow_id_override or env["NEURONLAB_WORKFLOW_ID"],
                 "workflow_schema_version": env["NEURONLAB_WORKFLOW_SCHEMA"],
             }
         }
@@ -119,3 +119,16 @@ def test_unified_workflow_passes_configured_severity_to_behavior_bench(tmp_path)
     assert command[command.index("--minimum-failing-severity") + 1] == "high"
     assert "--minimum-failing-severity" not in specs[1]["command"]
     assert "--minimum-failing-severity" not in specs[2]["command"]
+
+
+def test_unified_workflow_rejects_stale_artifacts_with_wrong_workflow_id(tmp_path):
+    behavior, safety, experiment, cases = _make_repositories(tmp_path)
+    report = run_workflow(
+        behavior_dir=behavior, safety_dir=safety, experiment_dir=experiment,
+        model_id="toy-model", cases=cases, output_root=tmp_path / "outputs",
+        runner=_fake_runner(workflow_id_override="stale-workflow"),
+    )
+    assert report["status"] == "failed"
+    assert report["quality_gate"]["passed"] is False
+    assert all(stage["status"] == "failed" for stage in report["stages"])
+    assert all("does not match" in stage["error"] for stage in report["stages"])
