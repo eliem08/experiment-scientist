@@ -14,6 +14,8 @@ import math
 import random
 import statistics
 import time
+import platform
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -137,9 +139,41 @@ def summarize_pairs(values: list[float], *, seed: int) -> dict[str, Any]:
             "interpretation": "Positive delta favors treatment only when the metric direction is higher; rule-based metric, not semantic quality."}
 
 
+def load_checkpoint_observations(path: Path, config_sha256: str) -> list[dict[str, Any]]:
+    """Load a checkpoint only when it belongs to the exact requested run configuration."""
+    try:
+        checkpoint = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read resume checkpoint {path}: {exc}") from exc
+    if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != "experiment-scientist.checkpoint.v1":
+        raise ValueError("Unsupported or malformed resume checkpoint schema")
+    if checkpoint.get("config_sha256") != config_sha256:
+        raise ValueError("Resume checkpoint does not match this spec/model/seed/generation/revision configuration; use a fresh output directory or remove the checkpoint.")
+    observations = checkpoint.get("observations")
+    if not isinstance(observations, list) or any(not isinstance(row, dict) for row in observations):
+        raise ValueError("Resume checkpoint observations must be a list of objects")
+    return observations
+
+
+def pair_is_complete(observations: list[dict[str, Any]], *, model_id: str, seed: int,
+                     case_id: str, metric_ids: set[str]) -> bool:
+    """Return true only if exactly one complete metric row exists for every metric in a pair."""
+    rows = [row for row in observations
+            if row.get("model_id") == model_id and row.get("seed") == seed
+            and row.get("case_id") == case_id]
+    found = [row.get("metric_id") for row in rows]
+    if not rows:
+        return False
+    if len(found) != len(metric_ids) or set(found) != metric_ids:
+        raise ValueError(f"Incomplete or duplicate checkpoint rows for {model_id}/{seed}/{case_id}; refusing to silently mix partial metric sets.")
+    return True
+
+
 def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: str = "auto",
                seeds: list[int] | None = None, max_new_tokens: int = 96,
-               do_sample: bool = False, temperature: float = 0.8, top_p: float = 0.95) -> dict[str, Any]:
+               do_sample: bool = False, temperature: float = 0.8, top_p: float = 0.95,
+               revision: str | None = None, tokenizer_revision: str | None = None,
+               resume: bool = False) -> dict[str, Any]:
     """Run a model × seed × case paired matrix and write JSON and CSV outputs."""
     if not model_ids or any(not model.strip() for model in model_ids):
         raise ValueError("At least one non-empty model ID is required")
@@ -170,13 +204,38 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
     observations: list[dict[str, Any]] = []
     summaries: list[dict[str, Any]] = []
     metrics = spec["metrics"]
+    effective_tokenizer_revision = tokenizer_revision or revision
+    run_config = {
+        "spec_sha256": spec_hash, "models": model_ids, "device": resolved_device,
+        "seeds": seeds, "max_new_tokens": max_new_tokens, "do_sample": do_sample,
+        "temperature": temperature if do_sample else None, "top_p": top_p if do_sample else None,
+        "model_revision": revision, "tokenizer_revision": effective_tokenizer_revision,
+    }
+    config_hash = hashlib.sha256(json.dumps(run_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    checkpoint_path = output / "matrix-checkpoint.json"
+    if resume and checkpoint_path.exists():
+        observations = load_checkpoint_observations(checkpoint_path, config_hash)
+    model_revisions: dict[str, Any] = {}
     for model_id in model_ids:
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-        model = AutoModelForCausalLM.from_pretrained(model_id).to(resolved_device).eval()
+        tokenizer_kwargs = {"revision": effective_tokenizer_revision} if effective_tokenizer_revision else {}
+        model_kwargs = {"revision": revision} if revision else {}
+        tokenizer = AutoTokenizer.from_pretrained(model_id, **tokenizer_kwargs)
+        model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs).to(resolved_device).eval()
+        model_revisions[model_id] = {
+            "requested_revision": revision,
+            "resolved_commit": getattr(model.config, "_commit_hash", None),
+            "tokenizer_requested_revision": effective_tokenizer_revision,
+            "tokenizer_resolved_commit": getattr(tokenizer, "init_kwargs", {}).get("_commit_hash"),
+        }
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token = tokenizer.eos_token
         for seed in seeds:
             for case in spec["cases"]:
+                if pair_is_complete(
+                    observations, model_id=model_id, seed=seed, case_id=case["id"],
+                    metric_ids={metric["id"] for metric in metrics},
+                ):
+                    continue
                 arms: dict[str, dict[str, Any]] = {}
                 # Reset to the same seed for each arm: paired stochastic comparison.
                 for arm in ("baseline", "treatment"):
@@ -210,6 +269,20 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
                         "baseline_response": arms["baseline"]["response"],
                         "treatment_response": arms["treatment"]["response"],
                     })
+                # Durable checkpoint after each complete paired case. A hard interruption
+                # can lose at most the in-flight pair, never the already committed matrix.
+                if resume:
+                    checkpoint_payload = {
+                        "schema_version": "experiment-scientist.checkpoint.v1",
+                        "config_sha256": config_hash,
+                        "config": run_config,
+                        "observations": observations,
+                        "updated_at_utc": datetime.now(timezone.utc).isoformat(),
+                    }
+                    checkpoint_path.write_text(
+                        json.dumps(checkpoint_payload, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+                        encoding="utf-8",
+                    )
         del model, tokenizer
         if torch.cuda.is_available() and str(resolved_device).startswith("cuda"):
             torch.cuda.empty_cache()
@@ -234,7 +307,18 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
         "experiment": {"title": spec["title"], "hypothesis": spec["hypothesis"],
                        "primary_metric": spec["primary_metric"], "spec_sha256": spec_hash,
                        "spec_path": str(spec_path), "pre_registered_at_utc": started},
-        "models": model_ids, "device": resolved_device, "seeds": seeds,
+        "models": model_ids, "model_revisions": model_revisions, "device": resolved_device, "seeds": seeds,
+        "reproducibility": {
+            "python_version": sys.version,
+            "platform": platform.platform(),
+            "torch_version": torch.__version__,
+            "transformers_version": __import__("transformers").__version__,
+            "cuda_version": torch.version.cuda,
+            "cuda_available": torch.cuda.is_available(),
+            "github_sha": __import__("os").environ.get("GITHUB_SHA"),
+            "run_config_sha256": config_hash,
+            "resume_enabled": resume,
+        },
         "generation": {"max_new_tokens": max_new_tokens, "do_sample": do_sample,
                        "temperature": temperature if do_sample else None,
                        "top_p": top_p if do_sample else None},
@@ -275,12 +359,16 @@ def main() -> None:
     parser.add_argument("--sample", action="store_true", help="Use paired seeded sampling instead of greedy decoding")
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.95)
+    parser.add_argument("--revision", help="Pinned Hugging Face model revision (branch, tag, or commit SHA)")
+    parser.add_argument("--tokenizer-revision", help="Pinned tokenizer revision; defaults to --revision")
+    parser.add_argument("--resume", action="store_true", help="Checkpoint each completed paired case and resume only with an identical configuration")
     args = parser.parse_args()
     try:
         seeds = [int(value.strip()) for value in args.seeds.split(",") if value.strip()]
         result = run_matrix(args.spec, model_ids=args.models, output=args.output, device=args.device,
                             seeds=seeds, max_new_tokens=args.max_new_tokens, do_sample=args.sample,
-                            temperature=args.temperature, top_p=args.top_p)
+                            temperature=args.temperature, top_p=args.top_p, revision=args.revision,
+                            tokenizer_revision=args.tokenizer_revision, resume=args.resume)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     print(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False))

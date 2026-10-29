@@ -13,14 +13,15 @@ A reproducible experiment manager for LLM prompt and model research: define hypo
 ## Current foundation
 
 - Paired baseline/treatment runner, deterministic generation, word-count summaries, JSON/CSV output, dashboard and Colab notebook.
-- **New:** validated JSON pre-registration spec, explicit outcome functions, model × seed × case matrix, per-observation CSV, spec SHA-256, paired case-level bootstrap intervals, and paired effect size.
+- Validated JSON pre-registration spec, explicit outcome functions, model × seed × case matrix, per-observation CSV, spec SHA-256, paired case-level bootstrap intervals, and paired effect size.
+- **New:** model/tokenizer revision pinning, resolved revision and runtime metadata, and resumable pair-level checkpoints that reject configuration drift and incomplete metric sets.
 
 ## Roadmap
 
 ### Phase 1 — Scientific discipline
 - [x] Move cases and hypotheses to a validated experiment-spec JSON file.
 - [x] Add explicit outcome functions rather than relying only on word count.
-- [ ] Store pinned model/tokenizer revisions and full package/environment versions.
+- [x] Record requested/resolved model and tokenizer revisions and core runtime versions (full lockfile export remains open).
 - [x] Add a deterministic percentile-bootstrap interval for paired outcomes, with limitations documented.
 - [x] Add repeated seeds and paired uncertainty analysis that aggregates within case before bootstrapping.
 - [ ] Add a results report that distinguishes exploratory from pre-registered analysis.
@@ -29,7 +30,7 @@ A reproducible experiment manager for LLM prompt and model research: define hypo
 - [ ] Dataset sampling and stratification.
 - [x] Multiple model/condition matrix (cost and latency accounting remains open).
 - [x] Statistical summaries and paired effect size with assumptions documented.
-- [ ] Resume failed batches and cache identical requests.
+- [x] Resume interrupted batches at complete paired-case boundaries; request-level response caching remains open.
 - [ ] Export Markdown/HTML report and raw artifact bundle.
 
 ### Phase 3 — Final product

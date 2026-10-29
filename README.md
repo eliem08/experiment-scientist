@@ -109,3 +109,23 @@ python experiment_matrix.py \\
 Use \`--sample\` to enable seeded sampling (defaults are greedy decoding). Results are written to \`matrix-results.json\` and \`matrix-observations.csv\`. Supported transparent outcome functions are \`word_count\`, \`character_count\`, \`contains\`, \`regex_match\`, and \`exact_match\`; the spec must declare which metric is primary. See [the experiment matrix guide](docs/EXPERIMENT_MATRIX.md) for the schema, interpretation, and limitations.
 
 **Scientific caution:** these deterministic metrics do not judge semantic correctness or safety. Repeated seeds do not compensate for too few or unrepresentative prompts. Bootstrap intervals are computed over case-level paired deltas after averaging seeds, avoiding the mistake of treating repeated runs of one prompt as independent prompts. The saved spec hash supports auditability, but does not independently prove when the spec was authored.
+
+
+### Pin revisions and resume long-running matrices
+
+For stronger reproducibility, pin the model and tokenizer to a Hugging Face commit SHA (or a stable tag):
+
+\`\`\`bash
+python experiment_matrix.py \
+  --spec examples/uncertainty-ablation.spec.json \
+  --model-id distilgpt2 \
+  --revision YOUR_MODEL_COMMIT_SHA \
+  --tokenizer-revision YOUR_TOKENIZER_COMMIT_SHA \
+  --seeds 17,29,43,71,101 \
+  --resume \
+  --output outputs/pinned-ablation
+\`\`\`
+
+`--tokenizer-revision` defaults to `--revision`. When `--resume` is enabled, the runner checkpoints after each completed model/seed/case pair in `matrix-checkpoint.json`. A resume is accepted only when the spec hash, models, device, seeds, generation settings, and requested revisions match the checkpoint. Incomplete or duplicate metric rows fail closed instead of silently mixing partial data. The final report records resolved model/tokenizer commits where available, Python/platform, PyTorch/Transformers versions, CUDA metadata, and the GitHub commit SHA when running in Actions.
+
+Pinning helps make runs reproducible but does not guarantee bit-identical output across hardware, CUDA kernels, or library versions. The checkpoint includes model responses; protect it like the final CSV/JSON outputs.
