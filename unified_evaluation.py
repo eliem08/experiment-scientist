@@ -32,6 +32,7 @@ def build_stage_specs(
     model_id: str, cases: Path, output_root: Path, device: str,
     max_new_tokens: int, seed: int, minimum_failing_severity: str | None = None,
     steering_dir: Path | None = None, flight_school_dir: Path | None = None,
+    steering_layer: int = 6,
 ) -> list[dict[str, Any]]:
     """Build explicit subprocess specs for configured local tools."""
     specs = [
@@ -83,6 +84,7 @@ def build_stage_specs(
                 sys.executable, str(steering_dir / "activation_steering.py"),
                 "--model-id", model_id, "--output", str(output_root / "steering-studio"),
                 "--device", device, "--max-new-tokens", str(max_new_tokens),
+                "--layer", str(steering_layer),
             ],
             "artifact": output_root / "steering-studio" / "steering.json",
         })
@@ -254,6 +256,7 @@ def run_workflow(
     max_new_tokens: int = 96, seed: int = 17, timeout_seconds: int = 7200,
     minimum_failing_severity: str | None = None,
     steering_dir: Path | None = None, flight_school_dir: Path | None = None,
+    steering_layer: int = 6,
     runner=subprocess.run,
 ) -> dict[str, Any]:
     """Execute all stages and produce a machine-readable unified report."""
@@ -271,6 +274,7 @@ def run_workflow(
         model_id=model_id, cases=cases, output_root=output_root, device=device,
         max_new_tokens=max_new_tokens, seed=seed, minimum_failing_severity=minimum_failing_severity,
         steering_dir=steering_dir, flight_school_dir=flight_school_dir,
+        steering_layer=steering_layer,
     )
     for spec in specs:
         if not spec["cwd"].is_dir():
@@ -432,6 +436,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--experiment-scientist-dir", type=Path, default=here)
     parser.add_argument("--steering-studio-dir", type=Path, help="Optional Steering Studio repository directory.")
     parser.add_argument("--neural-flight-school-dir", type=Path, help="Optional Neural Flight School repository directory.")
+    parser.add_argument("--steering-layer", type=int, default=6, help="Transformer block for Steering Studio (must exist in the selected model).")
     parser.add_argument("--model-id", default="distilgpt2")
     parser.add_argument("--cases", type=Path, help="JSONL case suite; defaults to behavior-bench/examples/cases.jsonl")
     parser.add_argument("--output", type=Path, default=Path("outputs/unified-evaluation"))
@@ -455,6 +460,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_new_tokens=args.max_new_tokens, seed=args.seed, timeout_seconds=args.timeout_seconds,
             minimum_failing_severity=args.minimum_failing_severity,
             steering_dir=steering_dir, flight_school_dir=flight_school_dir,
+            steering_layer=args.steering_layer,
         )
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
