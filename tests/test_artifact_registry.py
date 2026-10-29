@@ -71,3 +71,31 @@ def test_extract_numeric_metrics_is_bounded():
 
     metrics = extract_numeric_metrics({f"metric_{i}": i for i in range(20)}, max_metrics=5)
     assert len(metrics) == 5
+
+
+def test_cli_exports_portable_json_report(tmp_path, capsys):
+    from workbench_cli import main
+
+    _write(tmp_path / "results.json")
+    code = main([str(tmp_path)])
+    output = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert output["summary"]["artifacts"] == 1
+    assert output["artifacts"][0]["run_id"] == "run-1"
+    assert "payload" not in output["artifacts"][0]
+
+
+def test_cli_writes_csv_and_returns_nonzero_on_read_errors(tmp_path, capsys):
+    from workbench_cli import main
+
+    _write(tmp_path / "results.json")
+    bad = tmp_path / "broken" / "results.json"
+    bad.parent.mkdir()
+    bad.write_text("{bad json", encoding="utf-8")
+    output_path = tmp_path / "history.csv"
+    code = main([str(tmp_path), "--format", "csv", "--output", str(output_path)])
+    assert code == 1
+    content = output_path.read_text(encoding="utf-8")
+    assert "project,model_id,run_id" in content
+    assert "behavior-bench" in content
+    assert capsys.readouterr().out == ""
