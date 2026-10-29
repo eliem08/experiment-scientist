@@ -146,3 +146,27 @@ def test_html_report_escapes_untrusted_labels_and_warning_text():
     assert "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;" in page
     assert "<script>alert('xss')</script>" not in page
     assert "&lt;baseline&gt;" in page
+
+
+
+def test_comparison_warns_when_case_suite_fingerprints_are_missing():
+    result = compare_workflows(_workflow("baseline"), _workflow("candidate"))
+    assert any("Case-suite SHA-256 fingerprint is missing" in warning for warning in result["warnings"])
+    assert any("Runner-script fingerprints are missing" in warning for warning in result["warnings"])
+
+
+def test_comparison_warns_when_runner_script_fingerprints_differ():
+    baseline = _workflow("baseline")
+    candidate = _workflow("candidate")
+    baseline["reproducibility"] = {
+        "case_suite": {"sha256": "a" * 64},
+        "runner_scripts": {"behavior-bench": {"sha256": "b" * 64}},
+    }
+    candidate["reproducibility"] = {
+        "case_suite": {"sha256": "a" * 64},
+        "runner_scripts": {"behavior-bench": {"sha256": "c" * 64}},
+    }
+    result = compare_workflows(baseline, candidate)
+    assert any("Runner-script SHA-256 fingerprints differ for behavior-bench" in warning
+               for warning in result["warnings"])
+    assert not any("Case-suite SHA-256 fingerprints differ" in warning for warning in result["warnings"])
