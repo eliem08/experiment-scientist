@@ -12,7 +12,7 @@ from typing import Any
 CONTRACT_VERSION = "neuronlab.run.v1"
 KNOWN_RESULT_NAMES = {
     "results.json", "probe-results.json", "experiment.json",
-    "report.json", "steering_report.json", "flight_school.json", "workflow.json",
+    "report.json", "steering_report.json", "flight_school.json", "workflow.json", "workflow-comparison.json",
 }
 
 
@@ -36,8 +36,24 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Artifact root must be a JSON object.")
     is_workflow = source.name == "workflow.json"
+    is_comparison = source.name == "workflow-comparison.json"
     manifest = payload.get("manifest")
-    if is_workflow:
+    if is_comparison:
+        warnings = list(payload.get("warnings", [])) if isinstance(payload.get("warnings"), list) else []
+        comparison_version = payload.get("schema_version")
+        candidate = payload.get("candidate") if isinstance(payload.get("candidate"), dict) else {}
+        comparison_id = candidate.get("workflow_id")
+        status = "valid" if comparison_version == "neuronlab.workflow-comparison.v1" and isinstance(payload.get("gate"), dict) else "legacy"
+        if status == "legacy":
+            warnings.append("Missing or unsupported workflow-comparison schema/gate.")
+        manifest = {
+            "project": "neuronlab-workflow-comparison",
+            "model_id": candidate.get("model_id"),
+            "run_id": comparison_id,
+            "created_at_utc": payload.get("created_at_utc"),
+            "schema_version": comparison_version,
+        }
+    elif is_workflow:
         warnings = []
         workflow_version = payload.get("schema_version")
         workflow_id = payload.get("workflow_id")
@@ -55,7 +71,7 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
         status, warnings = _manifest_status(manifest)
         if not isinstance(manifest, dict):
             manifest = {}
-    rows = payload.get("cases")
+    rows = payload.get("comparisons") if is_comparison else payload.get("cases")
     if not isinstance(rows, list):
         rows = payload.get("results")
     if not isinstance(rows, list):
@@ -72,7 +88,7 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
         "project": manifest.get("project") or payload.get("project") or "unknown",
         "model_id": payload.get("model_id") or payload.get("model") or manifest.get("model_id") or "unknown",
         "run_id": manifest.get("run_id"),
-        "workflow_id": manifest.get("workflow_id") or (payload.get("workflow_id") if is_workflow else None),
+        "workflow_id": manifest.get("workflow_id") or (payload.get("workflow_id") if is_workflow else (manifest.get("run_id") if is_comparison else None)),
         "created_at_utc": manifest.get("created_at_utc"),
         "schema_version": manifest.get("schema_version"),
         "manifest_status": status,
