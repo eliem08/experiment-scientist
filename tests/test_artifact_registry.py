@@ -265,3 +265,36 @@ def test_unified_workflow_scorecard_includes_cross_tool_metrics():
     assert metrics["Behavior forbidden-hit cases"] == 1
     assert metrics["Safety heuristic signals"] == 2
     assert metrics["Experiment mean word delta"] == 4.5
+
+
+
+def test_inspect_artifact_normalizes_workflow_comparison(tmp_path):
+    path = tmp_path / "workflow-comparison.json"
+    path.write_text(json.dumps({
+        "schema_version": "neuronlab.workflow-comparison.v1",
+        "created_at_utc": "2026-10-29T10:00:00+00:00",
+        "baseline": {"workflow_id": "old-run", "model_id": "toy-model"},
+        "candidate": {"workflow_id": "new-run", "model_id": "toy-model"},
+        "gate": {"passed": False, "blockers": ["expected_pass_rate regressed"]},
+        "comparisons": [{"metric": "expected_pass_rate", "delta": -0.2}],
+        "warnings": ["fixture warning"],
+    }), encoding="utf-8")
+    item = inspect_artifact(path)
+    assert item["manifest_status"] == "valid"
+    assert item["project"] == "neuronlab-workflow-comparison"
+    assert item["workflow_id"] == "new-run"
+    assert item["row_count"] == 1
+    assert "fixture warning" in item["warnings"]
+
+
+def test_scan_artifacts_discovers_workflow_comparison(tmp_path):
+    path = tmp_path / "workflow-comparison.json"
+    path.write_text(json.dumps({
+        "schema_version": "neuronlab.workflow-comparison.v1",
+        "candidate": {"workflow_id": "new-run", "model_id": "toy-model"},
+        "gate": {"passed": True, "blockers": []},
+        "comparisons": [],
+    }), encoding="utf-8")
+    result = scan_artifacts([tmp_path])
+    assert result["summary"]["artifacts"] == 1
+    assert result["artifacts"][0]["project"] == "neuronlab-workflow-comparison"
