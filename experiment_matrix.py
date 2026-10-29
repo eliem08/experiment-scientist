@@ -139,6 +139,36 @@ def summarize_pairs(values: list[float], *, seed: int) -> dict[str, Any]:
             "interpretation": "Positive delta favors treatment only when the metric direction is higher; rule-based metric, not semantic quality."}
 
 
+def load_checkpoint_observations(path: Path, config_sha256: str) -> list[dict[str, Any]]:
+    """Load a checkpoint only when it belongs to the exact requested run configuration."""
+    try:
+        checkpoint = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read resume checkpoint {path}: {exc}") from exc
+    if not isinstance(checkpoint, dict) or checkpoint.get("schema_version") != "experiment-scientist.checkpoint.v1":
+        raise ValueError("Unsupported or malformed resume checkpoint schema")
+    if checkpoint.get("config_sha256") != config_sha256:
+        raise ValueError("Resume checkpoint does not match this spec/model/seed/generation/revision configuration; use a fresh output directory or remove the checkpoint.")
+    observations = checkpoint.get("observations")
+    if not isinstance(observations, list) or any(not isinstance(row, dict) for row in observations):
+        raise ValueError("Resume checkpoint observations must be a list of objects")
+    return observations
+
+
+def pair_is_complete(observations: list[dict[str, Any]], *, model_id: str, seed: int,
+                     case_id: str, metric_ids: set[str]) -> bool:
+    """Return true only if exactly one complete metric row exists for every metric in a pair."""
+    rows = [row for row in observations
+            if row.get("model_id") == model_id and row.get("seed") == seed
+            and row.get("case_id") == case_id]
+    found = [row.get("metric_id") for row in rows]
+    if not rows:
+        return False
+    if len(found) != len(metric_ids) or set(found) != metric_ids:
+        raise ValueError(f"Incomplete or duplicate checkpoint rows for {model_id}/{seed}/{case_id}; refusing to silently mix partial metric sets.")
+    return True
+
+
 def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: str = "auto",
                seeds: list[int] | None = None, max_new_tokens: int = 96,
                do_sample: bool = False, temperature: float = 0.8, top_p: float = 0.95,
@@ -184,15 +214,7 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
     config_hash = hashlib.sha256(json.dumps(run_config, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     checkpoint_path = output / "matrix-checkpoint.json"
     if resume and checkpoint_path.exists():
-        try:
-            checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-            raise ValueError(f"Cannot read resume checkpoint {checkpoint_path}: {exc}") from exc
-        if checkpoint.get("config_sha256") != config_hash:
-            raise ValueError("Resume checkpoint does not match this spec/model/seed/generation/revision configuration; use a fresh output directory or remove the checkpoint.")
-        observations = checkpoint.get("observations", [])
-        if not isinstance(observations, list) or any(not isinstance(row, dict) for row in observations):
-            raise ValueError("Resume checkpoint observations must be a list of objects")
+        observations = load_checkpoint_observations(checkpoint_path, config_hash)
     model_revisions: dict[str, Any] = {}
     for model_id in model_ids:
         tokenizer_kwargs = {"revision": effective_tokenizer_revision} if effective_tokenizer_revision else {}
@@ -209,14 +231,11 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
             tokenizer.pad_token = tokenizer.eos_token
         for seed in seeds:
             for case in spec["cases"]:
-                existing = [row for row in observations
-                            if row.get("model_id") == model_id and row.get("seed") == seed
-                            and row.get("case_id") == case["id"]]
-                existing_metrics = {row.get("metric_id") for row in existing}
-                if existing_metrics == {metric["id"] for metric in metrics}:
+                if pair_is_complete(
+                    observations, model_id=model_id, seed=seed, case_id=case["id"],
+                    metric_ids={metric["id"] for metric in metrics},
+                ):
                     continue
-                if existing:
-                    raise ValueError(f"Incomplete checkpoint rows for {model_id}/{seed}/{case['id']}; refusing to silently mix partial metric sets.")
                 arms: dict[str, dict[str, Any]] = {}
                 # Reset to the same seed for each arm: paired stochastic comparison.
                 for arm in ("baseline", "treatment"):
