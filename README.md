@@ -69,3 +69,16 @@ The default case suite is `behavior-bench/examples/cases.jsonl`. Model weights m
 See [WORKFLOW_CONTRACT.md](WORKFLOW_CONTRACT.md) for the machine-readable workflow semantics and gate rules. You can pass `--minimum-failing-severity high` to configure Behavior Bench's regression threshold. The unified quality gate fails if any stage fails or if Behavior Bench's configured regression gate fails. Safety Probe Lab's marker signals are shown as heuristic triage, not as a validated safety score; Experiment Scientist's word deltas are descriptive response-length differences, not measures of answer quality. The workflow does not claim a model is safe or correct simply because its stages completed.
 
 The top-level `workflow.json` is also recognized by the Workbench run-history registry. Point `workbench_dashboard.py` at the workflow output directory to inspect the unified workflow alongside individual run artifacts.
+
+
+### Compare a candidate run against a baseline
+
+After running the workflow for a baseline model or revision, keep its `workflow.json` and compare a candidate workflow against it:
+
+```powershell
+python compare_workflows.py --baseline outputs/baseline/workflow.json --candidate outputs/unified-evaluation/workflow.json --output outputs/comparison.json
+```
+
+The comparison report includes metric deltas, configuration/model mismatch warnings, and a regression gate. By default, it blocks an expected-pass-rate drop greater than 5 percentage points or any increase in Behavior Bench cases with forbidden-marker hits. Tune thresholds explicitly with `--max-pass-rate-drop 0.02` and `--max-forbidden-hit-increase 1`. It exits non-zero when a configured regression is detected or the candidate workflow's own quality gate failed.
+
+Safety Probe Lab heuristic counts and Experiment Scientist response-length deltas are diagnostics only; they do not affect the regression gate. Keep baseline and candidate case suites and metric definitions comparable. This is an engineering regression signal, not a certification of correctness or safety. Regression comparisons are tested with synthetic fixtures in CI; run actual local model inference before relying on results.
