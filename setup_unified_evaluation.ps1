@@ -47,7 +47,7 @@ if (-not (Test-Path $VenvPython)) {
 Write-Host "Installing Experiment Scientist dependencies. This may take several minutes."
 & $VenvPython -m pip install --upgrade pip
 if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed." }
-& $VenvPython -m pip install -r (Join-Path $Root "requirements.txt")
+& $VenvPython -m pip install -r (Join-Path $Root "requirements-evaluation.txt")
 if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
 
 Write-Host ""
