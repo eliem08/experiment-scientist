@@ -1,9 +1,9 @@
-$ErrorActionPreference = "Stop"
 param(
     [switch]$SkipInstall,
     [string]$PythonCommand = "python"
 )
 
+$ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Parent = Split-Path -Parent $Root
 $Repositories = @(
