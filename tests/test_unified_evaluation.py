@@ -75,6 +75,7 @@ def test_unified_workflow_runs_all_stages_with_shared_workflow_id(tmp_path):
     assert all(stage["manifest_workflow_id"] == report["workflow_id"] for stage in report["stages"])
     saved = json.loads((output / "workflow.json").read_text(encoding="utf-8"))
     assert saved["workflow_id"] == report["workflow_id"]
+    assert saved["report_path"] == str(output / "workflow.json")
     assert len(saved["artifacts"]) == 3
 
 
@@ -103,3 +104,18 @@ def test_unified_workflow_continues_and_records_failed_stage(tmp_path):
     assert stages["safety-probe-lab"]["status"] == "failed"
     assert stages["safety-probe-lab"]["exit_code"] == 2
     assert stages["experiment-scientist"]["status"] == "completed"
+
+
+def test_unified_workflow_passes_configured_severity_to_behavior_bench(tmp_path):
+    from unified_evaluation import build_stage_specs
+
+    behavior, safety, experiment, cases = _make_repositories(tmp_path)
+    specs = build_stage_specs(
+        behavior_dir=behavior, safety_dir=safety, experiment_dir=experiment,
+        model_id="toy-model", cases=cases, output_root=tmp_path / "out",
+        device="cpu", max_new_tokens=20, seed=7, minimum_failing_severity="high",
+    )
+    command = specs[0]["command"]
+    assert command[command.index("--minimum-failing-severity") + 1] == "high"
+    assert "--minimum-failing-severity" not in specs[1]["command"]
+    assert "--minimum-failing-severity" not in specs[2]["command"]
