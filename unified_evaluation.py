@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import argparse
 import html
+import hashlib
 import json
 import os
+import platform
 import subprocess
 import sys
 import time
@@ -290,6 +292,13 @@ def run_workflow(
         "safety_probe_lab": stage_metrics.get("safety-probe-lab", {}),
         "experiment_scientist": stage_metrics.get("experiment-scientist", {}),
     }
+    def sha256_file(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
     report = {
         "schema_version": SCHEMA_VERSION,
         "workflow_id": workflow_id,
@@ -298,6 +307,22 @@ def run_workflow(
         "model_id": model_id,
         "device": device,
         "config": {"max_new_tokens": max_new_tokens, "seed": seed, "timeout_seconds": timeout_seconds, "minimum_failing_severity": minimum_failing_severity},
+        "reproducibility": {
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "case_suite": {
+                "path": str(cases.resolve()),
+                "size_bytes": cases.stat().st_size,
+                "sha256": sha256_file(cases),
+            },
+            "runner_scripts": {
+                spec["name"]: {
+                    "path": str(spec["script"].resolve()),
+                    "sha256": sha256_file(spec["script"]),
+                }
+                for spec in specs
+            },
+        },
         "status": "completed" if all(stage["status"] == "completed" for stage in stages) else "failed",
         "quality_gate": {"passed": not gate_blockers, "blockers": gate_blockers},
         "summary": workflow_summary,
