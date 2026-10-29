@@ -1,6 +1,7 @@
 name: unified-evaluation-smoke
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       model_id:
