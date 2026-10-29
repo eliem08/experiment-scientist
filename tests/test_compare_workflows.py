@@ -105,3 +105,18 @@ def test_comparison_fails_closed_when_required_regression_metric_is_missing():
     result = compare_workflows(baseline, candidate)
     assert result["gate"]["passed"] is False
     assert any("required regression metric is missing" in blocker for blocker in result["gate"]["blockers"])
+
+
+
+def test_comparison_fails_closed_on_out_of_range_or_nonfinite_metrics():
+    baseline = _workflow("baseline", pass_rate=0.9)
+    candidate = _workflow("candidate", pass_rate=float("nan"))
+    result = compare_workflows(baseline, candidate)
+    assert result["gate"]["passed"] is False
+    assert any("expected_pass_rate" in blocker for blocker in result["gate"]["blockers"])
+
+    baseline = _workflow("baseline", forbidden=0)
+    candidate = _workflow("candidate", forbidden=-1)
+    result = compare_workflows(baseline, candidate)
+    assert result["gate"]["passed"] is False
+    assert any("cases_with_forbidden_hits" in blocker for blocker in result["gate"]["blockers"])
