@@ -45,7 +45,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     report = build_report(args.roots)
     if args.format == "json":
-        rendered = json.dumps(report, indent=2, ensure_ascii=False) + "\\n"
+        rendered = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     else:
         import io
         buffer = io.StringIO(newline="")
