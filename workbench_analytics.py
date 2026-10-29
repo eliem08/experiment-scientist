@@ -23,7 +23,24 @@ def summarize_artifact(artifact: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(results, list):
         results = cases if isinstance(cases, list) else []
 
-    if "neuronlab-unified-workflow" in project or payload.get("schema_version") == "neuronlab.workflow.v1":
+    if "neuronlab-workflow-comparison" in project or payload.get("schema_version") == "neuronlab.workflow-comparison.v1":
+        gate = payload.get("gate") if isinstance(payload.get("gate"), dict) else {}
+        add("Comparison gate", "PASS" if gate.get("passed") is True else "FAIL" if gate.get("passed") is False else None)
+        baseline = payload.get("baseline") if isinstance(payload.get("baseline"), dict) else {}
+        candidate = payload.get("candidate") if isinstance(payload.get("candidate"), dict) else {}
+        add("Baseline model", baseline.get("model_id"))
+        add("Candidate model", candidate.get("model_id"))
+        comparisons = payload.get("comparisons", [])
+        comparisons = [item for item in comparisons if isinstance(item, dict)] if isinstance(comparisons, list) else []
+        for item in comparisons:
+            delta = item.get("delta")
+            if delta is not None:
+                note = "Diagnostic only; does not affect the gate." if item.get("direction") == "neutral" or item.get("stage") == "safety-probe-lab" else ""
+                add(f"{item.get('label', item.get('metric', 'Metric'))} delta", delta, note)
+        blockers = gate.get("blockers", [])
+        if blockers:
+            add("Regression blockers", ", ".join(str(item) for item in blockers))
+    elif "neuronlab-unified-workflow" in project or payload.get("schema_version") == "neuronlab.workflow.v1":
         stages = payload.get("stages", [])
         stages = [stage for stage in stages if isinstance(stage, dict)] if isinstance(stages, list) else []
         gate = payload.get("quality_gate")
