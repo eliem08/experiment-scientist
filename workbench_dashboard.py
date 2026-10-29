@@ -11,6 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from artifact_registry import extract_numeric_metrics, scan_artifacts
+from workbench_analytics import summarize_artifact
 
 st.set_page_config(page_title="NeuronLab Workbench", layout="wide")
 st.title("NeuronLab Workbench")
