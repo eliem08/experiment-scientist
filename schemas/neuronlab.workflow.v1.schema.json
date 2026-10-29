@@ -95,7 +95,8 @@
       "type": "array",
       "items": {"type": "string"}
     },
-    "report_path": {"type": "string"}
+    "report_path": {"type": "string"},
+    "html_report_path": {"type": "string"}
   },
   "additionalProperties": true
 }
