@@ -99,3 +99,57 @@ def test_cli_writes_csv_and_returns_nonzero_on_read_errors(tmp_path, capsys):
     assert "project,model_id,run_id" in content
     assert "behavior-bench" in content
     assert capsys.readouterr().out == ""
+
+
+def test_project_summaries_use_behavior_bench_quality_gate_and_metrics():
+    from workbench_analytics import summarize_artifact
+
+    artifact = {
+        "project": "behavior-bench",
+        "payload": {
+            "manifest": {"project": "behavior-bench"},
+            "quality_gate": {"passed": False},
+            "summary": {"total": 4, "expected_pass_rate": 0.75, "cases_with_forbidden_hits": 1},
+            "cases": [{"structured_pass": True}, {"structured_pass": False}],
+        },
+    }
+    metrics = {row["metric"]: row["value"] for row in summarize_artifact(artifact)}
+    assert metrics["Cases evaluated"] == 4
+    assert metrics["Expected-check pass rate"] == 0.75
+    assert metrics["Quality gate"] == "FAIL"
+    assert metrics["Structured JSON pass rate"] == 0.5
+
+
+def test_project_summaries_mark_safety_metrics_as_heuristics():
+    from workbench_analytics import summarize_artifact
+
+    artifact = {
+        "project": "safety-probe-lab",
+        "payload": {"results": [
+            {"heuristic_signal": True, "marker_count": 2},
+            {"heuristic_signal": False, "marker_count": 0},
+        ]},
+    }
+    metrics = {row["metric"]: row["value"] for row in summarize_artifact(artifact)}
+    assert metrics["Probes evaluated"] == 2
+    assert metrics["Heuristic signal count"] == 1
+    assert metrics["Heuristic signal rate"] == 0.5
+
+
+def test_project_summaries_report_paired_experiment_delta_without_claiming_quality():
+    from workbench_analytics import summarize_artifact
+
+    artifact = {
+        "project": "experiment-scientist",
+        "payload": {
+            "results": [
+                {"word_delta_treatment_minus_baseline": 2},
+                {"word_delta_treatment_minus_baseline": -1},
+            ],
+            "bootstrap_word_delta": {"mean": 0.5, "lower": -2.0, "upper": 3.0},
+        },
+    }
+    metrics = {row["metric"]: row["value"] for row in summarize_artifact(artifact)}
+    assert metrics["Paired prompts"] == 2
+    assert metrics["Mean treatment-minus-baseline word delta"] == 0.5
+    assert metrics["Bootstrap CI lower"] == -2.0
