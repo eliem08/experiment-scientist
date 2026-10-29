@@ -37,6 +37,14 @@ jobs:
         with:
           repository: eliem08/safety-probe-lab
           path: safety-probe-lab
+      - uses: actions/checkout@v5
+        with:
+          repository: eliem08/steering-studio
+          path: steering-studio
+      - uses: actions/checkout@v5
+        with:
+          repository: eliem08/neural-flight-school
+          path: neural-flight-school
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
@@ -44,7 +52,7 @@ jobs:
           cache-dependency-path: experiment-scientist/requirements-evaluation.txt
       - name: Install runtime dependencies
         run: python -m pip install -r experiment-scientist/requirements-evaluation.txt
-      - name: Run all three evaluators on a real Hugging Face model
+      - name: Run five runnable tools on a real Hugging Face model
         id: evaluation
         continue-on-error: true
         env:
@@ -55,12 +63,15 @@ jobs:
             --behavior-bench-dir "$GITHUB_WORKSPACE/behavior-bench" \
             --safety-probe-dir "$GITHUB_WORKSPACE/safety-probe-lab" \
             --experiment-scientist-dir "$GITHUB_WORKSPACE/experiment-scientist" \
+            --steering-studio-dir "$GITHUB_WORKSPACE/steering-studio" \
+            --neural-flight-school-dir "$GITHUB_WORKSPACE/neural-flight-school" \
+            --steering-layer 1 \
             --model-id "$MODEL_ID" \
             --device cpu \
             --max-new-tokens "$MAX_NEW_TOKENS" \
             --timeout-seconds 1200 \
             --output "$GITHUB_WORKSPACE/unified-smoke-output"
-      - name: Validate that the three stages actually executed
+      - name: Validate that all five runnable stages actually executed
         if: always()
         run: |
           python - <<'PY'
@@ -72,7 +83,7 @@ jobs:
               raise SystemExit("Unified workflow did not produce workflow.json")
           report = json.loads(report_path.read_text(encoding="utf-8"))
           stages = report.get("stages", [])
-          expected = {"behavior-bench", "safety-probe-lab", "experiment-scientist"}
+          expected = {"behavior-bench", "safety-probe-lab", "experiment-scientist", "steering-studio", "neural-flight-school"}
           actual = {item.get("name") for item in stages}
           if actual != expected:
               raise SystemExit(f"Unexpected stage set: {actual}")
@@ -80,7 +91,7 @@ jobs:
           if failed:
               details = "; ".join(f"{item.get('name')}: {item.get('error', item.get('status'))}" for item in failed)
               raise SystemExit("One or more real inference stages failed: " + details)
-          print(f"All {len(stages)} real inference stages completed for model {report.get('model_id')}.")
+          print(f"All {len(stages)} runnable stages completed for model {report.get('model_id')}.")
           print(f"Workflow quality gate passed: {report.get('quality_gate', {}).get('passed')}")
           PY
       - name: Upload workflow report, logs, and evaluator artifacts
@@ -92,6 +103,8 @@ jobs:
             unified-smoke-output/
             behavior-bench/outputs/
             safety-probe-lab/outputs/
+            steering-studio/outputs/
+            neural-flight-school/outputs/
             experiment-scientist/outputs/
           if-no-files-found: warn
           retention-days: 14
