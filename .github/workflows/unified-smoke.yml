@@ -41,9 +41,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: experiment-scientist/requirements-ci.txt
+          cache-dependency-path: experiment-scientist/requirements-evaluation.txt
       - name: Install runtime dependencies
-        run: python -m pip install -r experiment-scientist/requirements-ci.txt
+        run: python -m pip install -r experiment-scientist/requirements-evaluation.txt
       - name: Run all three evaluators on a real Hugging Face model
         id: evaluation
         continue-on-error: true
