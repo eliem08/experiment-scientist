@@ -80,6 +80,10 @@ def test_unified_workflow_runs_all_stages_with_shared_workflow_id(tmp_path):
     saved = json.loads((output / "workflow.json").read_text(encoding="utf-8"))
     assert saved["workflow_id"] == report["workflow_id"]
     assert saved["report_path"] == str(output / "workflow.json")
+    assert saved["html_report_path"] == str(output / "workflow-report.html")
+    html_report = (output / "workflow-report.html").read_text(encoding="utf-8")
+    assert "NeuronLab Unified Evaluation" in html_report
+    assert "PASS" in html_report
     assert len(saved["artifacts"]) == 3
 
 
@@ -165,3 +169,21 @@ def test_unified_workflow_rejects_invalid_runtime_limits(tmp_path):
         run_workflow(**common, max_new_tokens=0)
     with pytest.raises(ValueError, match="timeout_seconds"):
         run_workflow(**common, timeout_seconds=0)
+
+
+def test_html_report_escapes_untrusted_stage_fields(tmp_path):
+    from unified_evaluation import render_workflow_html
+
+    path = tmp_path / "report.html"
+    render_workflow_html({
+        "workflow_id": "<script>alert(1)</script>",
+        "model_id": "toy-model",
+        "device": "cpu",
+        "status": "failed",
+        "quality_gate": {"passed": False, "blockers": ["unsafe <stage>"]},
+        "stages": [{"name": "<img src=x>", "status": "failed", "error": "<script>"}],
+    }, path)
+    rendered = path.read_text(encoding="utf-8")
+    assert "<script>alert(1)</script>" not in rendered
+    assert "<img src=x>" not in rendered
+    assert "&lt;script&gt;" in rendered
