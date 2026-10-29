@@ -189,6 +189,7 @@ def test_registry_recognizes_unified_workflow_reports(tmp_path):
     assert item["manifest_status"] == "valid"
     assert item["project"] == "neuronlab-unified-workflow"
     assert item["run_id"] == "workflow-123"
+    assert item["workflow_id"] == "workflow-123"
     assert item["schema_version"] == "neuronlab.workflow.v1"
     assert item["row_count"] == 2
 
@@ -211,3 +212,23 @@ def test_project_summaries_surface_unified_workflow_gate_and_stage_failures():
     assert metrics["Stages failed"] == 1
     assert metrics["Unified quality gate"] == "FAIL"
     assert metrics["Gate blockers"] == "safety-probe-lab"
+
+
+def test_cli_includes_unified_workflow_status_and_gate_in_export(tmp_path, capsys):
+    from workbench_cli import main
+
+    path = tmp_path / "workflow.json"
+    path.write_text(json.dumps({
+        "schema_version": "neuronlab.workflow.v1",
+        "workflow_id": "workflow-cli-test",
+        "model_id": "toy-model",
+        "status": "failed",
+        "quality_gate": {"passed": False, "blockers": ["safety-probe-lab"]},
+        "stages": [],
+    }), encoding="utf-8")
+    assert main([str(path)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    item = report["artifacts"][0]
+    assert item["workflow_id"] == "workflow-cli-test"
+    assert item["workflow_status"] == "failed"
+    assert item["quality_gate_passed"] is False
