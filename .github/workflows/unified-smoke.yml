@@ -57,8 +57,8 @@ jobs:
         id: evaluation
         continue-on-error: true
         env:
-          MODEL_ID: ${{ inputs.model_id }}
-          MAX_NEW_TOKENS: ${{ inputs.max_new_tokens }}
+          MODEL_ID: ${{ inputs.model_id || 'sshleifer/tiny-gpt2' }}
+          MAX_NEW_TOKENS: ${{ inputs.max_new_tokens || '24' }}
         run: |
           python experiment-scientist/unified_evaluation.py \
             --behavior-bench-dir "$GITHUB_WORKSPACE/behavior-bench" \
