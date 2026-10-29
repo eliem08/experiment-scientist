@@ -1,6 +1,7 @@
 # NeuronLab Unified Workflow Contract
 
-**Schema:** `neuronlab.workflow.v1`
+**Schema:** `neuronlab.workflow.v1`  
+**JSON Schema:** [`schemas/neuronlab.workflow.v1.schema.json`](schemas/neuronlab.workflow.v1.schema.json)
 
 A workflow is one invocation of `unified_evaluation.py`. It is separate from each tool's `neuronlab.run.v1` manifest: the workflow groups multiple runs, while each child artifact keeps its own unique `run_id`.
 
