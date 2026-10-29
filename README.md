@@ -60,6 +60,6 @@ To customize paths or output:
 
 The default case suite is `behavior-bench/examples/cases.jsonl`. Model weights may need to be downloaded on the first run, and the workflow can take a while on CPU. The default stage timeout is two hours; change it with `--timeout-seconds`.
 
-The unified quality gate fails if any stage fails or if Behavior Bench's configured regression gate fails. Safety Probe Lab's marker signals are shown as heuristic triage, not as a validated safety score; Experiment Scientist's word deltas are descriptive response-length differences, not measures of answer quality. The workflow does not claim a model is safe or correct simply because its stages completed.
+See [WORKFLOW_CONTRACT.md](WORKFLOW_CONTRACT.md) for the machine-readable workflow semantics and gate rules. You can pass `--minimum-failing-severity high` to configure Behavior Bench's regression threshold. The unified quality gate fails if any stage fails or if Behavior Bench's configured regression gate fails. Safety Probe Lab's marker signals are shown as heuristic triage, not as a validated safety score; Experiment Scientist's word deltas are descriptive response-length differences, not measures of answer quality. The workflow does not claim a model is safe or correct simply because its stages completed.
 
 The top-level `workflow.json` is also recognized by the Workbench run-history registry. Point `workbench_dashboard.py` at the workflow output directory to inspect the unified workflow alongside individual run artifacts.
