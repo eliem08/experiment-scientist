@@ -1,5 +1,5 @@
-# Runtime dependencies needed by the three local Transformers evaluators.
-# UI and plotting dependencies are intentionally excluded.
+# Runtime dependencies for local evaluators and optional attention visualization adapter.
 torch>=2.2
 transformers>=4.45
 numpy>=1.26
+matplotlib>=3.8
