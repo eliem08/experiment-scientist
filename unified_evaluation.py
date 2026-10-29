@@ -84,6 +84,7 @@ def _read_artifact_summary(path: Path) -> dict[str, Any]:
         "run_id": manifest.get("run_id") if isinstance(manifest, dict) else None,
         "manifest_workflow_id": manifest.get("workflow_id") if isinstance(manifest, dict) else None,
         "artifact_model_id": payload.get("model_id") or (manifest.get("model_id") if isinstance(manifest, dict) else None),
+        "artifact_device": payload.get("device") or (manifest.get("device") if isinstance(manifest, dict) else None),
     }
     if isinstance(payload, dict):
         project = str(manifest.get("project", "")) if isinstance(manifest, dict) else ""
@@ -129,6 +130,7 @@ def render_workflow_html(report: dict[str, Any], path: Path) -> None:
             stage.get("exit_code", ""),
             stage.get("duration_seconds", ""),
             stage.get("artifact_model_id", ""),
+            stage.get("artifact_device", ""),
             stage.get("manifest_workflow_id", ""),
             stage.get("error", ""),
         ]
@@ -139,7 +141,7 @@ def render_workflow_html(report: dict[str, Any], path: Path) -> None:
     gate = report.get("quality_gate", {})
     gate_status = "PASS" if gate.get("passed") is True else "FAIL"
     blockers = ", ".join(str(value) for value in gate.get("blockers", [])) or "None"
-    stage_rows = "\n".join(rows) or '<tr><td colspan="8">No stages recorded.</td></tr>'
+    stage_rows = "\n".join(rows) or '<tr><td colspan="9">No stages recorded.</td></tr>'
     document = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -167,7 +169,7 @@ small{{color:#4b5563}}
 </div>
 <h2>Stage results</h2>
 <table>
-<thead><tr><th>Stage</th><th>Status</th><th>Exit code</th><th>Seconds</th><th>Model ID</th><th>Workflow ID</th><th>Error</th><th>Metrics</th></tr></thead>
+<thead><tr><th>Stage</th><th>Status</th><th>Exit code</th><th>Seconds</th><th>Model ID</th><th>Resolved device</th><th>Workflow ID</th><th>Error</th><th>Metrics</th></tr></thead>
 <tbody>{stage_rows}</tbody>
 </table>
 <h2>Interpretation limits</h2>
