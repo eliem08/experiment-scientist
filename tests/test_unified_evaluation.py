@@ -88,6 +88,8 @@ def test_unified_workflow_runs_all_stages_with_shared_workflow_id(tmp_path):
     html_report = (output / "workflow-report.html").read_text(encoding="utf-8")
     assert "NeuronLab Unified Evaluation" in html_report
     assert "PASS" in html_report
+    assert "Reproducibility fingerprints" in html_report
+    assert "SHA-256" in html_report
     assert len(saved["artifacts"]) == 3
     assert saved["summary"]["stages_completed"] == 3
     assert saved["summary"]["behavior_bench"]["expected_pass_rate"] == 1.0
