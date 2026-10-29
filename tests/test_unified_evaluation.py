@@ -40,6 +40,7 @@ def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=No
             "manifest": {
                 "project": project,
                 "model_id": artifact_model,
+                "device": "cpu",
                 "run_id": f"{project}-run",
                 "workflow_id": workflow_id_override or env["NEURONLAB_WORKFLOW_ID"],
                 "workflow_schema_version": env["NEURONLAB_WORKFLOW_SCHEMA"],
@@ -77,6 +78,7 @@ def test_unified_workflow_runs_all_stages_with_shared_workflow_id(tmp_path):
     assert len(report["stages"]) == 3
     assert all(stage["status"] == "completed" for stage in report["stages"])
     assert all(stage["manifest_workflow_id"] == report["workflow_id"] for stage in report["stages"])
+    assert all(stage["artifact_device"] == "cpu" for stage in report["stages"])
     saved = json.loads((output / "workflow.json").read_text(encoding="utf-8"))
     assert saved["workflow_id"] == report["workflow_id"]
     assert saved["report_path"] == str(output / "workflow.json")
