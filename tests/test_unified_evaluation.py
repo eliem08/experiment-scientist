@@ -20,7 +20,7 @@ def _make_repositories(tmp_path):
     return behavior, safety, experiment, cases
 
 
-def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=None, model_id_override=None):
+def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=None, model_id_override=None, nonzero_on_behavior_gate=False):
     def run(command, *, cwd, env, capture_output, text, timeout, check):
         script = Path(command[1]).name
         stage_by_script = {
@@ -60,6 +60,8 @@ def _fake_runner(*, behavior_gate=True, fail_stage=None, workflow_id_override=No
                 "bootstrap_word_delta": {"mean": 2, "lower": None, "upper": None},
             })
         (output / filename).write_text(json.dumps(payload), encoding="utf-8")
+        if project == "behavior-bench" and not behavior_gate and nonzero_on_behavior_gate:
+            return SimpleNamespace(returncode=1, stdout=json.dumps({"quality_gate": {"passed": False}}), stderr="")
         return SimpleNamespace(returncode=0, stdout="ok", stderr="")
     return run
 
@@ -193,3 +195,21 @@ def test_html_report_escapes_untrusted_stage_fields(tmp_path):
     assert "<script>alert(1)</script>" not in rendered
     assert "<img src=x>" not in rendered
     assert "&lt;script&gt;" in rendered
+
+
+def test_expected_behavior_gate_exit_retains_valid_artifact_without_marking_stage_crashed(tmp_path):
+    behavior, safety, experiment, cases = _make_repositories(tmp_path)
+    output = tmp_path / "outputs"
+    report = run_workflow(
+        behavior_dir=behavior, safety_dir=safety, experiment_dir=experiment,
+        model_id="toy-model", cases=cases, output_root=output,
+        minimum_failing_severity="high",
+        runner=_fake_runner(behavior_gate=False, nonzero_on_behavior_gate=True),
+    )
+    behavior_stage = next(stage for stage in report["stages"] if stage["name"] == "behavior-bench")
+    assert behavior_stage["status"] == "completed"
+    assert behavior_stage["exit_code"] == 1
+    assert "regression gate failed" in behavior_stage["note"]
+    assert report["status"] == "completed"
+    assert report["quality_gate"]["passed"] is False
+    assert len(report["artifacts"]) == 3
