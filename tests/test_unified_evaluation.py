@@ -150,3 +150,18 @@ def test_unified_workflow_rejects_mixed_model_artifacts(tmp_path):
     assert all(stage["status"] == "failed" for stage in report["stages"])
     assert all("model ID does not match" in stage["error"] for stage in report["stages"])
     assert report["artifacts"] == []
+
+
+def test_unified_workflow_rejects_invalid_runtime_limits(tmp_path):
+    import pytest
+
+    behavior, safety, experiment, cases = _make_repositories(tmp_path)
+    common = dict(
+        behavior_dir=behavior, safety_dir=safety, experiment_dir=experiment,
+        model_id="toy-model", cases=cases, output_root=tmp_path / "outputs",
+        runner=_fake_runner(),
+    )
+    with pytest.raises(ValueError, match="max_new_tokens"):
+        run_workflow(**common, max_new_tokens=0)
+    with pytest.raises(ValueError, match="timeout_seconds"):
+        run_workflow(**common, timeout_seconds=0)
