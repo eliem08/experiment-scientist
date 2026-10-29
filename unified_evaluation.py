@@ -1,7 +1,8 @@
-"""Run Behavior Bench, Safety Probe Lab, and Experiment Scientist as one workflow.
+"""Run configured NeuronLab tools as one provenance-linked workflow.
 
-This orchestrator reuses each tool's existing CLI, keeps its result files separate,
-and writes workflow.json linking the stages by one workflow ID.
+The three core evaluators remain required. Steering Studio and Neural Flight School
+are optional adapters; Neuron Explorer is integrated as a read-only artifact source.
+Native artifacts remain separate and are linked by the parent workflow report.
 """
 from __future__ import annotations
 
