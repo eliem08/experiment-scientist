@@ -1,6 +1,6 @@
 # Six-Tool Orchestration: Implementation Contract
 
-**Status:** phased implementation; five tools have executable adapters, the sixth is artifact-import only  
+**Status:** five executable adapters implemented; a manual real-model smoke workflow now covers all five, with the sixth integrated as artifact-import only  
 **Target:** extend the existing unified evaluation workflow without weakening its current provenance, failure-reporting, or quality-gate behavior.
 
 ## Current verified baseline
@@ -50,11 +50,12 @@ Use a finite status vocabulary: `pending`, `running`, `completed`, `failed`, `ti
 
 **Acceptance:** unit tests cover valid configuration, missing paths, invalid stage names, duplicate stage names, and API stages disabled by default.
 
-### Phase 2 — local tool adapters (partially complete)
+### Phase 2 — local tool adapters (implemented; real-model smoke pending)
 
 - Completed: Steering Studio and Neural Flight School adapters, with native output preservation and synthetic tests.
 - Completed: read-only import of precomputed Neuron Explorer depth reports.
-- Remaining: validate real end-to-end execution against each external repository in an environment with its dependencies and, for Neuron Explorer, its GPU/run data.
+- A manual GitHub Actions smoke workflow now checks out the four sibling tool repositories, runs the five executable stages on a real Hugging Face model, and uploads the workflow report and native artifacts. Trigger it from Actions to validate end-to-end execution in GitHub's runner.
+- Neuron Explorer remains a read-only import because its GPU-backed sweep is a separate workflow; validate import with a real `depth_report.json` when one is available.
 - Preserve each tool's native artifact and add a small normalized stage summary only.
 - Add synthetic-fixture tests for success, non-zero exit, missing artifact, malformed JSON, timeout, and workflow-ID mismatch.
 
@@ -88,4 +89,4 @@ Use a finite status vocabulary: `pending`, `running`, `completed`, `failed`, `ti
 
 ## Remaining verification
 
-Run the new GitHub Actions tests and perform real-model smoke tests for the five runnable adapters. Verify Neuron Explorer imports against a real `depth_report.json`. Do not enable automatic GPU sweeps or API-backed evaluation by default.
+GitHub Actions unit tests have passed on the previous implementation commit; confirm the newest run after this change. Trigger the manual five-tool real-model smoke workflow before calling the integration end-to-end validated. Verify Neuron Explorer imports against a real `depth_report.json`. Do not enable automatic GPU sweeps or API-backed evaluation by default.
