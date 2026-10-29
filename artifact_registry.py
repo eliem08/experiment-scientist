@@ -63,6 +63,33 @@ def inspect_artifact(path: str | Path) -> dict[str, Any]:
     }
 
 
+def extract_numeric_metrics(payload: dict[str, Any], *, max_metrics: int = 250) -> dict[str, int | float]:
+    """Extract comparable numeric scalars without assuming tool-specific result schemas.
+
+    Manifest/provenance values are deliberately excluded. Nested dictionary paths
+    become dotted keys; list rows are not expanded because row schemas differ by tool.
+    Booleans are excluded because their meaning is not consistently numeric.
+    """
+    metrics: dict[str, int | float] = {}
+
+    def visit(value: Any, prefix: str = "") -> None:
+        if len(metrics) >= max_metrics or not isinstance(value, dict):
+            return
+        for key, child in value.items():
+            if key == "manifest":
+                continue
+            path = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(child, dict):
+                visit(child, path)
+            elif isinstance(child, (int, float)) and not isinstance(child, bool):
+                metrics[path] = child
+            if len(metrics) >= max_metrics:
+                return
+
+    visit(payload)
+    return metrics
+
+
 def scan_artifacts(roots: list[str | Path]) -> dict[str, Any]:
     """Scan known result filenames under supplied roots and report duplicates/errors."""
     found: list[dict[str, Any]] = []
