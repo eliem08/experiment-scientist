@@ -50,8 +50,12 @@ The CLI exports normalized run metadata, manifest warnings, read errors, and dup
 
 The unified runner orchestrates the local model evaluators in Behavior Bench, Safety Probe Lab, and Experiment Scientist, using the same model ID, device, and generation-token limit. Each tool still writes its own native artifact and log; the runner adds a shared workflow ID to each provenance manifest and creates a top-level `workflow.json` with stage statuses, artifact paths, key metrics, and a consolidated quality gate. A failed stage does not silently disappear: later stages still run, and the workflow exits non-zero.
 
-Clone the three repositories as sibling folders next to `experiment-scientist`, install the model-tool requirements in each repository, then run from this repository:
+Clone the three repositories as sibling folders next to `experiment-scientist`. Create one shared Python virtual environment and install the common requirements once (the three `requirements.txt` files currently match), then run from this repository:
 
+    python -m venv .venv
+    # Windows PowerShell: .\.venv\Scripts\Activate.ps1
+    # macOS/Linux: source .venv/bin/activate
+    python -m pip install -r requirements.txt
     python unified_evaluation.py --model-id distilgpt2 --device cpu
 
 To customize paths or output:
