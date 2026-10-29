@@ -272,6 +272,7 @@ def test_inspect_artifact_normalizes_workflow_comparison(tmp_path):
     path = tmp_path / "workflow-comparison.json"
     path.write_text(json.dumps({
         "schema_version": "neuronlab.workflow-comparison.v1",
+        "comparison_id": "comparison-unique-1",
         "created_at_utc": "2026-10-29T10:00:00+00:00",
         "baseline": {"workflow_id": "old-run", "model_id": "toy-model"},
         "candidate": {"workflow_id": "new-run", "model_id": "toy-model"},
@@ -283,6 +284,7 @@ def test_inspect_artifact_normalizes_workflow_comparison(tmp_path):
     assert item["manifest_status"] == "valid"
     assert item["project"] == "neuronlab-workflow-comparison"
     assert item["workflow_id"] == "new-run"
+    assert item["run_id"] == "comparison-unique-1"
     assert item["row_count"] == 1
     assert "fixture warning" in item["warnings"]
 
@@ -291,6 +293,7 @@ def test_scan_artifacts_discovers_workflow_comparison(tmp_path):
     path = tmp_path / "workflow-comparison.json"
     path.write_text(json.dumps({
         "schema_version": "neuronlab.workflow-comparison.v1",
+        "comparison_id": "comparison-unique-2",
         "candidate": {"workflow_id": "new-run", "model_id": "toy-model"},
         "gate": {"passed": True, "blockers": []},
         "comparisons": [],
