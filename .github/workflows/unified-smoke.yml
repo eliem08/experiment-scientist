@@ -1,0 +1,97 @@
+name: unified-evaluation-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: "Small Hugging Face causal LM used for an actual CPU inference smoke run"
+        required: true
+        default: "sshleifer/tiny-gpt2"
+        type: string
+      max_new_tokens:
+        description: "Maximum generated tokens per evaluator call"
+        required: true
+        default: "24"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unified-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: experiment-scientist
+      - uses: actions/checkout@v4
+        with:
+          repository: eliem08/behavior-bench
+          path: behavior-bench
+      - uses: actions/checkout@v4
+        with:
+          repository: eliem08/safety-probe-lab
+          path: safety-probe-lab
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: experiment-scientist/requirements-ci.txt
+      - name: Install runtime dependencies
+        run: python -m pip install -r experiment-scientist/requirements-ci.txt
+      - name: Run all three evaluators on a real Hugging Face model
+        id: evaluation
+        continue-on-error: true
+        env:
+          MODEL_ID: ${{ inputs.model_id }}
+          MAX_NEW_TOKENS: ${{ inputs.max_new_tokens }}
+        run: |
+          python experiment-scientist/unified_evaluation.py \
+            --behavior-bench-dir "$GITHUB_WORKSPACE/behavior-bench" \
+            --safety-probe-dir "$GITHUB_WORKSPACE/safety-probe-lab" \
+            --experiment-scientist-dir "$GITHUB_WORKSPACE/experiment-scientist" \
+            --model-id "$MODEL_ID" \
+            --device cpu \
+            --max-new-tokens "$MAX_NEW_TOKENS" \
+            --timeout-seconds 1200 \
+            --output "$GITHUB_WORKSPACE/unified-smoke-output"
+      - name: Validate that the three stages actually executed
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_path = Path("unified-smoke-output/workflow.json")
+          if not report_path.is_file():
+              raise SystemExit("Unified workflow did not produce workflow.json")
+          report = json.loads(report_path.read_text(encoding="utf-8"))
+          stages = report.get("stages", [])
+          expected = {"behavior-bench", "safety-probe-lab", "experiment-scientist"}
+          actual = {item.get("name") for item in stages}
+          if actual != expected:
+              raise SystemExit(f"Unexpected stage set: {actual}")
+          failed = [item for item in stages if item.get("status") != "completed"]
+          if failed:
+              details = "; ".join(f"{item.get('name')}: {item.get('error', item.get('status'))}" for item in failed)
+              raise SystemExit("One or more real inference stages failed: " + details)
+          print(f"All {len(stages)} real inference stages completed for model {report.get('model_id')}.")
+          print(f"Workflow quality gate passed: {report.get('quality_gate', {}).get('passed')}")
+          PY
+      - name: Upload workflow report, logs, and evaluator artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unified-evaluation-smoke-${{ github.run_id }}
+          path: |
+            unified-smoke-output/
+            behavior-bench/outputs/
+            safety-probe-lab/outputs/
+            experiment-scientist/outputs/
+          if-no-files-found: warn
+          retention-days: 14
