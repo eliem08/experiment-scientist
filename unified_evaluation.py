@@ -270,6 +270,15 @@ def run_workflow(
     gate_blockers = [stage["name"] for stage in stages if stage["status"] != "completed"]
     if behavior_metrics.get("quality_gate_passed") is False:
         gate_blockers.append("behavior-bench-quality-gate")
+    stage_metrics = {stage["name"]: stage.get("metrics", {}) for stage in stages}
+    workflow_summary = {
+        "stages_total": len(stages),
+        "stages_completed": sum(stage["status"] == "completed" for stage in stages),
+        "stages_failed": sum(stage["status"] == "failed" for stage in stages),
+        "behavior_bench": stage_metrics.get("behavior-bench", {}),
+        "safety_probe_lab": stage_metrics.get("safety-probe-lab", {}),
+        "experiment_scientist": stage_metrics.get("experiment-scientist", {}),
+    }
     report = {
         "schema_version": SCHEMA_VERSION,
         "workflow_id": workflow_id,
@@ -280,6 +289,7 @@ def run_workflow(
         "config": {"max_new_tokens": max_new_tokens, "seed": seed, "timeout_seconds": timeout_seconds, "minimum_failing_severity": minimum_failing_severity},
         "status": "completed" if all(stage["status"] == "completed" for stage in stages) else "failed",
         "quality_gate": {"passed": not gate_blockers, "blockers": gate_blockers},
+        "summary": workflow_summary,
         "stages": stages,
         "artifacts": [stage["artifact"] for stage in stages if stage["status"] == "completed" and Path(stage["artifact"]).is_file()],
     }
