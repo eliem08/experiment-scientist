@@ -12,6 +12,8 @@
     "model_id",
     "device",
     "config",
+    "reproducibility",
+    "summary",
     "status",
     "quality_gate",
     "stages",
