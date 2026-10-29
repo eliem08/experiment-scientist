@@ -50,12 +50,12 @@ The CLI exports normalized run metadata, manifest warnings, read errors, and dup
 
 The unified runner currently orchestrates the three local Transformers evaluators in Behavior Bench, Safety Probe Lab, and Experiment Scientist, using the same model ID, device, and generation-token limit. It does not yet orchestrate API-only evaluation or the interpretability/steering tools. Each tool still writes its own native artifact and log; the runner adds a shared workflow ID to each provenance manifest and creates a top-level `workflow.json` plus a self-contained `workflow-report.html` with stage statuses, artifact paths, key metrics, and a consolidated quality gate. A failed stage does not silently disappear: later stages still run, and the workflow exits non-zero.
 
-Clone the three repositories as sibling folders next to `experiment-scientist`. On Windows, `./setup_unified_evaluation.ps1` clones the two sibling repositories if missing, creates `.venv`, and installs this repository's dependencies. Use `-SkipInstall` to clone only. On macOS/Linux, clone the sibling repositories manually. Then run from this repository:
+Clone the three repositories as sibling folders next to `experiment-scientist`. On Windows, `./setup_unified_evaluation.ps1` clones the two sibling repositories if missing, creates `.venv`, and installs the lean runtime dependencies from `requirements-evaluation.txt`. Use `-SkipInstall` to clone only. On macOS/Linux, clone the sibling repositories manually. Then run from this repository:
 
     python -m venv .venv
     # Windows PowerShell: .\.venv\Scripts\Activate.ps1
     # macOS/Linux: source .venv/bin/activate
-    python -m pip install -r requirements.txt
+    python -m pip install -r requirements-evaluation.txt
     python unified_evaluation.py --model-id distilgpt2 --device cpu
 
 On Windows PowerShell, use the same command, or run `./run_unified_evaluation.ps1 --model-id distilgpt2 --device cpu`.
