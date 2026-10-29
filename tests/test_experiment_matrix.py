@@ -78,3 +78,52 @@ def test_bootstrap_rejects_invalid_configuration():
         bootstrap_mean_ci([1.0, 2.0], iterations=10)
     with pytest.raises(ValueError, match="confidence"):
         bootstrap_mean_ci([1.0, 2.0], confidence=1.0)
+
+
+def test_report_renderer_includes_outcomes_performance_and_reproducibility():
+    from render_matrix_report import render_html, render_markdown
+
+    payload = {
+        "schema_version": "experiment-scientist.matrix.v1",
+        "experiment": {"title": "Ablation", "hypothesis": "Treatment helps", "primary_metric": "contains", "spec_sha256": "abc"},
+        "models": ["toy-model"],
+        "device": "cpu",
+        "seeds": [17, 29],
+        "runtime_seconds": 12.5,
+        "summaries": [{
+            "model_id": "toy-model", "metric_id": "contains", "direction": "higher",
+            "cases": 4, "seeds_per_case": 2, "mean": 0.5, "lower": 0.1, "upper": 0.9, "cohens_dz": 0.7,
+        }],
+        "performance_summary": [{
+            "model_id": "toy-model", "paired_cases": 8,
+            "baseline_mean_generation_seconds": 0.4, "treatment_mean_generation_seconds": 0.5,
+            "baseline_mean_output_tokens_per_second": 20.0, "treatment_mean_output_tokens_per_second": 18.0,
+        }],
+        "reproducibility": {"python_version": "3.11", "torch_version": "2.x", "github_sha": "deadbeef"},
+        "model_revisions": {"toy-model": {"resolved_commit": "modelsha", "tokenizer_resolved_commit": "toksha"}},
+        "interpretation_limits": ["This is a rule-based metric."],
+        "observations": [],
+    }
+    markdown = render_markdown(payload)
+    assert "Outcome summaries" in markdown
+    assert "Performance" in markdown
+    assert "0.4000" in markdown
+    assert "modelsha" in markdown
+    assert "rule-based metric" in markdown
+    page = render_html(payload)
+    assert "<!doctype html>" in page
+    assert "&lt;script&gt;" not in page
+
+
+def test_report_renderer_escapes_untrusted_html_fields():
+    from render_matrix_report import render_html
+
+    payload = {
+        "experiment": {"title": "<script>alert(1)</script>", "hypothesis": "<img src=x>"},
+        "models": [], "seeds": [], "summaries": [], "performance_summary": [],
+        "reproducibility": {}, "model_revisions": {},
+        "interpretation_limits": [], "observations": [],
+    }
+    page = render_html(payload)
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
