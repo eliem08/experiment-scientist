@@ -112,6 +112,8 @@ def test_report_renderer_includes_outcomes_performance_and_reproducibility():
     assert "rule-based metric" in markdown
     page = render_html(payload)
     assert "<!doctype html>" in page
+    assert "<table>" in page
+    assert "<h2>Performance</h2>" in page
     assert "&lt;script&gt;" not in page
 
 
