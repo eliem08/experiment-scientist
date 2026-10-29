@@ -139,7 +139,7 @@ def render_workflow_html(report: dict[str, Any], path: Path) -> None:
     gate = report.get("quality_gate", {})
     gate_status = "PASS" if gate.get("passed") is True else "FAIL"
     blockers = ", ".join(str(value) for value in gate.get("blockers", [])) or "None"
-    stage_rows = "\\n".join(rows) or '<tr><td colspan="8">No stages recorded.</td></tr>'
+    stage_rows = "\n".join(rows) or '<tr><td colspan="8">No stages recorded.</td></tr>'
     document = f"""<!doctype html>
 <html lang="en">
 <head>
