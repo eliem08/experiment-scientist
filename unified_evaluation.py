@@ -26,7 +26,7 @@ def _utc_now() -> str:
 def build_stage_specs(
     *, behavior_dir: Path, safety_dir: Path, experiment_dir: Path,
     model_id: str, cases: Path, output_root: Path, device: str,
-    max_new_tokens: int, seed: int,
+    max_new_tokens: int, seed: int, minimum_failing_severity: str | None = None,
 ) -> list[dict[str, Any]]:
     """Build explicit subprocess specs for the three supported local evaluators."""
     return [
@@ -40,7 +40,7 @@ def build_stage_specs(
                 "--model-id", model_id, "--cases", str(cases),
                 "--output", str(output_root / "behavior-bench"),
                 "--device", device, "--max-new-tokens", str(max_new_tokens),
-            ],
+            ] + (["--minimum-failing-severity", minimum_failing_severity] if minimum_failing_severity else []),
             "artifact": output_root / "behavior-bench" / "results.json",
         },
         {
@@ -119,7 +119,7 @@ def run_workflow(
     *, behavior_dir: Path, safety_dir: Path, experiment_dir: Path,
     model_id: str, cases: Path, output_root: Path, device: str = "auto",
     max_new_tokens: int = 96, seed: int = 17, timeout_seconds: int = 7200,
-    runner=subprocess.run,
+    minimum_failing_severity: str | None = None, runner=subprocess.run,
 ) -> dict[str, Any]:
     """Execute all stages and produce a machine-readable unified report."""
     workflow_id = str(uuid.uuid4())
@@ -128,7 +128,7 @@ def run_workflow(
     specs = build_stage_specs(
         behavior_dir=behavior_dir, safety_dir=safety_dir, experiment_dir=experiment_dir,
         model_id=model_id, cases=cases, output_root=output_root, device=device,
-        max_new_tokens=max_new_tokens, seed=seed,
+        max_new_tokens=max_new_tokens, seed=seed, minimum_failing_severity=minimum_failing_severity,
     )
     for spec in specs:
         if not spec["cwd"].is_dir():
@@ -200,7 +200,7 @@ def run_workflow(
         "completed_at_utc": _utc_now(),
         "model_id": model_id,
         "device": device,
-        "config": {"max_new_tokens": max_new_tokens, "seed": seed, "timeout_seconds": timeout_seconds},
+        "config": {"max_new_tokens": max_new_tokens, "seed": seed, "timeout_seconds": timeout_seconds, "minimum_failing_severity": minimum_failing_severity},
         "status": "completed" if all(stage["status"] == "completed" for stage in stages) else "failed",
         "quality_gate": {"passed": not gate_blockers, "blockers": gate_blockers},
         "stages": stages,
@@ -224,6 +224,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="auto")
     parser.add_argument("--max-new-tokens", type=int, default=96)
     parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--minimum-failing-severity", choices=("low", "normal", "high", "critical"))
     parser.add_argument("--timeout-seconds", type=int, default=7200)
     args = parser.parse_args(argv)
     behavior_dir = args.behavior_bench_dir.expanduser().resolve()
@@ -236,6 +237,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             behavior_dir=behavior_dir, safety_dir=safety_dir, experiment_dir=experiment_dir,
             model_id=args.model_id, cases=cases, output_root=output_root, device=args.device,
             max_new_tokens=args.max_new_tokens, seed=args.seed, timeout_seconds=args.timeout_seconds,
+            minimum_failing_severity=args.minimum_failing_severity,
         )
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
