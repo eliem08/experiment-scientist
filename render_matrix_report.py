@@ -77,24 +77,72 @@ def render_markdown(payload: dict[str, Any]) -> str:
 
 
 def render_html(payload: dict[str, Any]) -> str:
-    md = render_markdown(payload)
-    # Escape the complete generated Markdown as text; model names and hypotheses are untrusted.
-    escaped = html.escape(md)
+    experiment = payload.get("experiment", {})
+    esc = lambda value: html.escape(str(value if value is not None else "n/a"))
+    metric_rows = []
+    for row in payload.get("summaries", []):
+        metric_rows.append(
+            "<tr>" + "".join(f"<td>{esc(value)}</td>" for value in (
+                row.get("model_id"), row.get("metric_id"), row.get("direction"),
+                row.get("cases"), row.get("seeds_per_case"), _fmt(row.get("mean")),
+                f"[{_fmt(row.get('lower'))}, {_fmt(row.get('upper'))}]",
+                _fmt(row.get("cohens_dz")),
+            )) + "</tr>"
+        )
+    performance_rows = []
+    for row in payload.get("performance_summary", []):
+        performance_rows.append(
+            "<tr>" + "".join(f"<td>{esc(value)}</td>" for value in (
+                row.get("model_id"), row.get("paired_cases"),
+                _fmt(row.get("baseline_mean_generation_seconds")),
+                _fmt(row.get("treatment_mean_generation_seconds")),
+                _fmt(row.get("baseline_mean_output_tokens_per_second")),
+                _fmt(row.get("treatment_mean_output_tokens_per_second")),
+            )) + "</tr>"
+        )
+    repro = payload.get("reproducibility", {})
+    repro_items = "".join(
+        f"<li><strong>{esc(key.replace('_', ' ').title())}:</strong> {esc(repro[key])}</li>"
+        for key in ("python_version", "platform", "torch_version", "transformers_version",
+                    "cuda_version", "github_sha", "run_config_sha256")
+        if repro.get(key) is not None
+    )
+    revisions = payload.get("model_revisions", {})
+    for model, details in revisions.items():
+        repro_items += f"<li><strong>{esc(model)} revisions:</strong> model {esc(details.get('resolved_commit') or 'not resolved')}; tokenizer {esc(details.get('tokenizer_resolved_commit') or 'not resolved')}</li>"
+    limits = "".join(f"<li>{esc(item)}</li>" for item in payload.get("interpretation_limits", []))
+    metric_rows_html = "".join(metric_rows) or '<tr><td colspan="8">No metric summaries available.</td></tr>'
+    performance_rows_html = "".join(performance_rows) or '<tr><td colspan="6">No performance summaries available.</td></tr>'
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Experiment Scientist Report</title>
+<title>{esc(experiment.get('title', 'Experiment Scientist Report'))}</title>
 <style>
-body {{ font: 16px/1.55 system-ui, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; color: #182230; }}
-pre {{ white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f7fa; border: 1px solid #dce2ea; border-radius: 8px; padding: 1.25rem; }}
+body {{ font: 16px/1.55 system-ui, sans-serif; max-width: 1200px; margin: 2rem auto; padding: 0 1rem; color: #182230; }}
+h1, h2 {{ line-height: 1.2; }} .muted {{ color: #596579; overflow-wrap: anywhere; }}
+table {{ width: 100%; border-collapse: collapse; display: block; overflow-x: auto; margin: 1rem 0 2rem; }}
+th, td {{ border: 1px solid #dce2ea; padding: .65rem; text-align: left; vertical-align: top; }}
+th {{ background: #f5f7fa; }} .panel {{ border: 1px solid #dce2ea; border-radius: 10px; padding: 1rem; margin: 1rem 0; }}
+code {{ overflow-wrap: anywhere; }}
 </style>
 </head>
-<body><h1>Experiment Scientist Report</h1><p>Readable text export of the matrix summary. Raw observations remain in the JSON/CSV files.</p><pre>{escaped}</pre></body>
+<body>
+<h1>{esc(experiment.get('title', 'Experiment report'))}</h1>
+<div class="panel"><strong>Hypothesis</strong><p>{esc(experiment.get('hypothesis', 'Not recorded'))}</p>
+<p class="muted">Primary metric: {esc(experiment.get('primary_metric', 'not recorded'))} · Spec SHA-256: <code>{esc(experiment.get('spec_sha256', 'not recorded'))}</code></p>
+<p class="muted">Models: {esc(', '.join(payload.get('models', [])))} · Device: {esc(payload.get('device', 'unknown'))} · Seeds: {esc(', '.join(str(seed) for seed in payload.get('seeds', [])))} · Runtime: {esc(_fmt(payload.get('runtime_seconds')))} seconds</p></div>
+<h2>Outcome summaries</h2>
+<table><thead><tr><th>Model</th><th>Metric</th><th>Direction</th><th>Cases</th><th>Seeds/case</th><th>Mean paired delta</th><th>Bootstrap interval</th><th>Cohen's dz</th></tr></thead><tbody>{metric_rows_html}</tbody></table>
+<h2>Performance</h2>
+<table><thead><tr><th>Model</th><th>Pairs</th><th>Baseline seconds</th><th>Treatment seconds</th><th>Baseline output tok/s</th><th>Treatment output tok/s</th></tr></thead><tbody>{performance_rows_html}</tbody></table>
+<h2>Reproducibility</h2><ul>{repro_items or '<li>No runtime metadata recorded.</li>'}</ul>
+<h2>Interpretation limits</h2><ul>{limits or '<li>No interpretation limits recorded.</li>'}</ul>
+<p class="muted">Performance depends on runtime and hardware; it is not a hosted API price estimate. Rule-based metrics are not semantic-quality or safety judgments. Raw observations remain in the JSON/CSV files.</p>
+</body>
 </html>
 """
-
 
 def load_result(path: Path) -> dict[str, Any]:
     try:
