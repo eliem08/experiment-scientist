@@ -20,7 +20,7 @@ def _make_repositories(tmp_path):
     return behavior, safety, experiment, cases
 
 
-def _fake_runner(*, behavior_gate=True, behavior_pass_rate=1.0, fail_stage=None, workflow_id_override=None, model_id_override=None, nonzero_on_behavior_gate=False):
+def _fake_runner(*, behavior_gate=True, behavior_pass_rate=1.0, fail_stage=None, timeout_stage=None, workflow_id_override=None, model_id_override=None, nonzero_on_behavior_gate=False):
     def run(command, *, cwd, env, capture_output, text, timeout, check):
         script = Path(command[1]).name
         stage_by_script = {
@@ -29,6 +29,9 @@ def _fake_runner(*, behavior_gate=True, behavior_pass_rate=1.0, fail_stage=None,
             "prompt_experiment.py": ("experiment-scientist", "experiment.json"),
         }
         project, filename = stage_by_script[script]
+        if project == timeout_stage:
+            import subprocess
+            raise subprocess.TimeoutExpired(command, timeout)
         if project == fail_stage:
             return SimpleNamespace(returncode=2, stdout="", stderr="fixture failure")
         output = Path(command[command.index("--output") + 1])
@@ -245,3 +248,19 @@ def test_generated_workflow_reports_feed_regression_comparator(tmp_path):
     assert any("expected_pass_rate" in blocker for blocker in comparison["gate"]["blockers"])
     assert comparison["baseline"]["workflow_id"] == baseline["workflow_id"]
     assert comparison["candidate"]["workflow_id"] == candidate["workflow_id"]
+
+
+
+def test_unified_workflow_records_timeout_and_continues_remaining_stages(tmp_path):
+    behavior, safety, experiment, cases = _make_repositories(tmp_path)
+    report = run_workflow(
+        behavior_dir=behavior, safety_dir=safety, experiment_dir=experiment,
+        model_id="toy-model", cases=cases, output_root=tmp_path / "outputs",
+        timeout_seconds=3, runner=_fake_runner(timeout_stage="safety-probe-lab"),
+    )
+    stages = {stage["name"]: stage for stage in report["stages"]}
+    assert report["status"] == "failed"
+    assert stages["safety-probe-lab"]["status"] == "failed"
+    assert "exceeded timeout of 3 seconds" in stages["safety-probe-lab"]["error"]
+    assert stages["experiment-scientist"]["status"] == "completed"
+    assert (tmp_path / "outputs" / "safety-probe-lab" / "workflow.log").exists()
