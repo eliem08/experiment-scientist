@@ -99,6 +99,7 @@
           "manifest_workflow_id": {"type": ["string", "null"]},
           "artifact_model_id": {"type": ["string", "null"]},
           "artifact_device": {"type": ["string", "null"]},
+          "note": {"type": "string"},
           "error": {"type": "string"}
         },
         "additionalProperties": true
