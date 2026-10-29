@@ -7,6 +7,7 @@ import hashlib
 import os
 import platform
 import sys
+import uuid
 
 def _package_version(name: str):
     try:
@@ -21,6 +22,8 @@ def build_manifest(project: str, *, model_id=None, device=None, seed=None, confi
         raw = value if isinstance(value, bytes) else str(value).encode("utf-8")
         input_hashes[name] = hashlib.sha256(raw).hexdigest()
     return {
+        "schema_version": "neuronlab.run.v1",
+        "run_id": str(uuid.uuid4()),
         "project": project,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "python_version": sys.version.split()[0],
