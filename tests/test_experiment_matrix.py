@@ -127,3 +127,38 @@ def test_report_renderer_escapes_untrusted_html_fields():
     page = render_html(payload)
     assert "<script>alert(1)</script>" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
+
+
+def test_performance_summary_counts_each_pair_once_not_once_per_metric():
+    from experiment_matrix import summarize_performance
+
+    shared = {
+        "model_id": "m", "seed": 17, "case_id": "c",
+        "baseline_generation_seconds": 2.0, "treatment_generation_seconds": 3.0,
+        "baseline_input_tokens": 10, "treatment_input_tokens": 12,
+        "baseline_output_tokens": 20, "treatment_output_tokens": 24,
+        "baseline_output_tokens_per_second": 10.0, "treatment_output_tokens_per_second": 8.0,
+    }
+    rows = [
+        {**shared, "metric_id": "a"},
+        {**shared, "metric_id": "b"},
+        {**shared, "seed": 29, "metric_id": "a", "baseline_generation_seconds": 4.0},
+    ]
+    summary = summarize_performance(rows, ["m"])[0]
+    assert summary["paired_cases"] == 2
+    assert summary["baseline_mean_generation_seconds"] == 3.0
+    assert summary["treatment_mean_generation_seconds"] == 3.0
+    assert summary["total_baseline_generation_seconds"] == 6.0
+
+
+def test_performance_summary_rejects_inconsistent_duplicate_metrics():
+    from experiment_matrix import summarize_performance
+
+    base = {
+        "model_id": "m", "seed": 17, "case_id": "c",
+        "baseline_generation_seconds": 2.0, "treatment_generation_seconds": 3.0,
+        "baseline_input_tokens": 10, "treatment_input_tokens": 12,
+        "baseline_output_tokens": 20, "treatment_output_tokens": 24,
+    }
+    with pytest.raises(ValueError, match="Inconsistent performance data"):
+        summarize_performance([{**base, "metric_id": "a"}, {**base, "metric_id": "b", "baseline_output_tokens": 999}], ["m"])
