@@ -101,7 +101,7 @@ def test_comparison_warns_when_case_suite_fingerprints_differ():
 def test_comparison_fails_closed_when_required_regression_metric_is_missing():
     baseline = _workflow("baseline")
     candidate = _workflow("candidate")
-    del candidate["summary"]["behavior-bench"]["expected_pass_rate"]
+    del candidate["summary"]["behavior_bench"]["expected_pass_rate"]
     result = compare_workflows(baseline, candidate)
     assert result["gate"]["passed"] is False
     assert any("required regression metric is missing" in blocker for blocker in result["gate"]["blockers"])
