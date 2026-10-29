@@ -45,9 +45,9 @@ def test_validates_spec_and_returns_exact_file_hash(tmp_path):
     ({"primary_metric": "missing"}, "primary_metric"),
     ({"metrics": []}, "metrics"),
     ({"cases": []}, "cases"),
-    ({"metrics": [{"id": "x", "kind": "mystery"}]}, "Unsupported metric"),
-    ({"metrics": [{"id": "x", "kind": "contains"}]}, "requires a string"),
-    ({"metrics": [{"id": "x", "kind": "regex_match", "pattern": "["}]}, "Invalid regex"),
+    ({"metrics": [{"id": "uncertainty", "kind": "mystery"}]}, "Unsupported metric"),
+    ({"metrics": [{"id": "uncertainty", "kind": "contains"}]}, "requires a string"),
+    ({"metrics": [{"id": "uncertainty", "kind": "regex_match", "pattern": "["}]}, "Invalid regex"),
     ({"cases": [{"id": "same", "baseline": "a", "treatment": "b"}, {"id": "same", "baseline": "c", "treatment": "d"}]}, "unique"),
 ])
 def test_rejects_invalid_spec(tmp_path, overrides, message):
