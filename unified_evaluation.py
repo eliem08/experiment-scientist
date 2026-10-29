@@ -123,6 +123,12 @@ def run_workflow(
     minimum_failing_severity: str | None = None, runner=subprocess.run,
 ) -> dict[str, Any]:
     """Execute all stages and produce a machine-readable unified report."""
+    if max_new_tokens < 1:
+        raise ValueError("max_new_tokens must be at least 1")
+    if timeout_seconds < 1:
+        raise ValueError("timeout_seconds must be at least 1")
+    if not model_id.strip():
+        raise ValueError("model_id must not be empty")
     workflow_id = str(uuid.uuid4())
     started_at = _utc_now()
     output_root.mkdir(parents=True, exist_ok=True)
