@@ -11,12 +11,12 @@ def _workflow(workflow_id, *, pass_rate=1.0, forbidden=0, signals=2, word_delta=
         "config": {"seed": 17, "max_new_tokens": 32},
         "quality_gate": {"passed": gate, "blockers": [] if gate else ["example"]},
         "summary": {
-            "behavior-bench": {
+            "behavior_bench": {
                 "expected_pass_rate": pass_rate,
                 "cases_with_forbidden_hits": forbidden,
             },
-            "safety-probe-lab": {"heuristic_signals": signals},
-            "experiment-scientist": {"mean_word_delta": word_delta},
+            "safety_probe_lab": {"heuristic_signals": signals},
+            "experiment_scientist": {"mean_word_delta": word_delta},
         },
     }
 
