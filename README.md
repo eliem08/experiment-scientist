@@ -109,3 +109,16 @@ python experiment_matrix.py \\
 Use \`--sample\` to enable seeded sampling (defaults are greedy decoding). Results are written to \`matrix-results.json\` and \`matrix-observations.csv\`. Supported transparent outcome functions are \`word_count\`, \`character_count\`, \`contains\`, \`regex_match\`, and \`exact_match\`; the spec must declare which metric is primary. See [the experiment matrix guide](docs/EXPERIMENT_MATRIX.md) for the schema, interpretation, and limitations.
 
 **Scientific caution:** these deterministic metrics do not judge semantic correctness or safety. Repeated seeds do not compensate for too few or unrepresentative prompts. Bootstrap intervals are computed over case-level paired deltas after averaging seeds, avoiding the mistake of treating repeated runs of one prompt as independent prompts. The saved spec hash supports auditability, but does not independently prove when the spec was authored.
+
+
+### Performance measurements and publishable summary files
+
+The matrix runner now records input/output token counts and generation latency for each baseline and treatment arm, plus per-model mean latency and output-token throughput. These are runtime measurements, not a hosted-API price estimate. Reports avoid duplicating pair-level performance statistics just because multiple outcome metrics are declared.
+
+Generate human-readable Markdown and HTML reports from a completed result:
+
+\`\`\`bash
+python render_matrix_report.py --input outputs/uncertainty-ablation/matrix-results.json
+\`\`\`
+
+By default this writes `matrix-results.md` and `matrix-results.html` beside the input file. Use `--output-md` and `--output-html` to choose destinations. The reports include the hypothesis and spec fingerprint, outcome summaries and intervals, performance comparisons, resolved revisions/runtime metadata when available, and interpretation limits. Raw observations remain in JSON/CSV rather than being copied into the summary report.

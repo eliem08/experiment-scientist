@@ -137,6 +137,44 @@ def summarize_pairs(values: list[float], *, seed: int) -> dict[str, Any]:
             "interpretation": "Positive delta favors treatment only when the metric direction is higher; rule-based metric, not semantic quality."}
 
 
+def summarize_performance(observations: list[dict[str, Any]], model_ids: list[str]) -> list[dict[str, Any]]:
+    """Summarize latency and throughput once per unique model/seed/case pair."""
+    summaries: list[dict[str, Any]] = []
+    for model_id in model_ids:
+        unique_pairs: dict[tuple[str, int, str], dict[str, Any]] = {}
+        for row in observations:
+            if row.get("model_id") == model_id:
+                key = (model_id, row["seed"], row["case_id"])
+                if key in unique_pairs:
+                    existing = unique_pairs[key]
+                    for field in ("baseline_generation_seconds", "treatment_generation_seconds",
+                                  "baseline_input_tokens", "treatment_input_tokens",
+                                  "baseline_output_tokens", "treatment_output_tokens"):
+                        if existing.get(field) != row.get(field):
+                            raise ValueError(f"Inconsistent performance data across metrics for {model_id}/{row['seed']}/{row['case_id']}")
+                else:
+                    unique_pairs[key] = row
+        pairs = list(unique_pairs.values())
+        def mean_field(name: str) -> float | None:
+            values = [float(row[name]) for row in pairs if isinstance(row.get(name), (int, float))]
+            return statistics.fmean(values) if values else None
+        summaries.append({
+            "model_id": model_id,
+            "paired_cases": len(pairs),
+            "baseline_mean_generation_seconds": mean_field("baseline_generation_seconds"),
+            "treatment_mean_generation_seconds": mean_field("treatment_generation_seconds"),
+            "baseline_mean_input_tokens": mean_field("baseline_input_tokens"),
+            "treatment_mean_input_tokens": mean_field("treatment_input_tokens"),
+            "baseline_mean_output_tokens": mean_field("baseline_output_tokens"),
+            "treatment_mean_output_tokens": mean_field("treatment_output_tokens"),
+            "baseline_mean_output_tokens_per_second": mean_field("baseline_output_tokens_per_second"),
+            "treatment_mean_output_tokens_per_second": mean_field("treatment_output_tokens_per_second"),
+            "total_baseline_generation_seconds": sum(float(row["baseline_generation_seconds"]) for row in pairs if isinstance(row.get("baseline_generation_seconds"), (int, float))),
+            "total_treatment_generation_seconds": sum(float(row["treatment_generation_seconds"]) for row in pairs if isinstance(row.get("treatment_generation_seconds"), (int, float))),
+        })
+    return summaries
+
+
 def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: str = "auto",
                seeds: list[int] | None = None, max_new_tokens: int = 96,
                do_sample: bool = False, temperature: float = 0.8, top_p: float = 0.95) -> dict[str, Any]:
@@ -190,13 +228,22 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
                     }
                     if do_sample:
                         generation.update({"temperature": temperature, "top_p": top_p})
+                    generation_started = time.perf_counter()
                     with torch.inference_mode():
                         generated = model.generate(**encoded, **generation)
+                    generation_seconds = time.perf_counter() - generation_started
                     response = tokenizer.decode(
                         generated[0][encoded["input_ids"].shape[1]:], skip_special_tokens=True
                     )
-                    arms[arm] = {"prompt": case[arm], "response": response,
-                                 "response_sha256": hashlib.sha256(response.encode()).hexdigest()}
+                    input_tokens = int(encoded["input_ids"].shape[1])
+                    output_tokens = int(generated.shape[1] - encoded["input_ids"].shape[1])
+                    arms[arm] = {
+                        "prompt": case[arm], "response": response,
+                        "response_sha256": hashlib.sha256(response.encode()).hexdigest(),
+                        "input_tokens": input_tokens, "output_tokens": output_tokens,
+                        "generation_seconds": generation_seconds,
+                        "output_tokens_per_second": output_tokens / generation_seconds if generation_seconds > 0 else None,
+                    }
                 for metric in metrics:
                     base_score = score_response(arms["baseline"]["response"], metric)
                     treatment_score = score_response(arms["treatment"]["response"], metric)
@@ -209,6 +256,14 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
                         "treatment_response_sha256": arms["treatment"]["response_sha256"],
                         "baseline_response": arms["baseline"]["response"],
                         "treatment_response": arms["treatment"]["response"],
+                        "baseline_input_tokens": arms["baseline"]["input_tokens"],
+                        "treatment_input_tokens": arms["treatment"]["input_tokens"],
+                        "baseline_output_tokens": arms["baseline"]["output_tokens"],
+                        "treatment_output_tokens": arms["treatment"]["output_tokens"],
+                        "baseline_generation_seconds": arms["baseline"]["generation_seconds"],
+                        "treatment_generation_seconds": arms["treatment"]["generation_seconds"],
+                        "baseline_output_tokens_per_second": arms["baseline"]["output_tokens_per_second"],
+                        "treatment_output_tokens_per_second": arms["treatment"]["output_tokens_per_second"],
                     })
         del model, tokenizer
         if torch.cuda.is_available() and str(resolved_device).startswith("cuda"):
@@ -228,6 +283,7 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
                 "cases": len(case_deltas), "seeds_per_case": len(seeds),
                 "observations": len(rows), **summary,
             })
+    performance_summary = summarize_performance(observations, model_ids)
     completed = datetime.now(timezone.utc).isoformat()
     payload = {
         "schema_version": "experiment-scientist.matrix.v1",
@@ -238,7 +294,7 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
         "generation": {"max_new_tokens": max_new_tokens, "do_sample": do_sample,
                        "temperature": temperature if do_sample else None,
                        "top_p": top_p if do_sample else None},
-        "summaries": summaries, "observations": observations,
+        "summaries": summaries, "performance_summary": performance_summary, "observations": observations,
         "runtime_seconds": round(time.monotonic() - start_clock, 3),
         "completed_at_utc": completed,
         "interpretation_limits": [
@@ -254,7 +310,10 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
     csv_path = output / "matrix-observations.csv"
     fields = ["model_id", "seed", "case_id", "metric_id", "metric_kind", "baseline_score",
               "treatment_score", "delta_treatment_minus_baseline", "baseline_response_sha256",
-              "treatment_response_sha256", "baseline_response", "treatment_response"]
+              "treatment_response_sha256", "baseline_input_tokens", "treatment_input_tokens",
+              "baseline_output_tokens", "treatment_output_tokens", "baseline_generation_seconds",
+              "treatment_generation_seconds", "baseline_output_tokens_per_second",
+              "treatment_output_tokens_per_second", "baseline_response", "treatment_response"]
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
