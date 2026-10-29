@@ -78,3 +78,48 @@ def test_bootstrap_rejects_invalid_configuration():
         bootstrap_mean_ci([1.0, 2.0], iterations=10)
     with pytest.raises(ValueError, match="confidence"):
         bootstrap_mean_ci([1.0, 2.0], confidence=1.0)
+
+
+def test_checkpoint_only_loads_for_matching_configuration(tmp_path):
+    from experiment_matrix import load_checkpoint_observations
+
+    path = tmp_path / "matrix-checkpoint.json"
+    path.write_text(json.dumps({
+        "schema_version": "experiment-scientist.checkpoint.v1",
+        "config_sha256": "a" * 64,
+        "observations": [{"model_id": "m", "seed": 17, "case_id": "c", "metric_id": "x"}],
+    }), encoding="utf-8")
+    assert load_checkpoint_observations(path, "a" * 64)[0]["metric_id"] == "x"
+    with pytest.raises(ValueError, match="does not match"):
+        load_checkpoint_observations(path, "b" * 64)
+
+
+def test_checkpoint_rejects_wrong_schema_and_invalid_observations(tmp_path):
+    from experiment_matrix import load_checkpoint_observations
+
+    path = tmp_path / "matrix-checkpoint.json"
+    path.write_text(json.dumps({"config_sha256": "a" * 64, "observations": []}), encoding="utf-8")
+    with pytest.raises(ValueError, match="schema"):
+        load_checkpoint_observations(path, "a" * 64)
+    path.write_text(json.dumps({
+        "schema_version": "experiment-scientist.checkpoint.v1",
+        "config_sha256": "a" * 64,
+        "observations": "not-a-list",
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="list of objects"):
+        load_checkpoint_observations(path, "a" * 64)
+
+
+def test_resume_skips_only_complete_pairs_and_rejects_partial_pairs():
+    from experiment_matrix import pair_is_complete
+
+    observations = [
+        {"model_id": "m", "seed": 17, "case_id": "c", "metric_id": "a"},
+        {"model_id": "m", "seed": 17, "case_id": "c", "metric_id": "b"},
+    ]
+    assert pair_is_complete(observations, model_id="m", seed=17, case_id="c", metric_ids={"a", "b"})
+    assert not pair_is_complete(observations, model_id="m", seed=29, case_id="c", metric_ids={"a", "b"})
+    with pytest.raises(ValueError, match="Incomplete or duplicate"):
+        pair_is_complete(observations[:1], model_id="m", seed=17, case_id="c", metric_ids={"a", "b"})
+    with pytest.raises(ValueError, match="Incomplete or duplicate"):
+        pair_is_complete(observations + [observations[0]], model_id="m", seed=17, case_id="c", metric_ids={"a", "b"})
