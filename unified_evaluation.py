@@ -192,7 +192,10 @@ small{{color:#4b5563}}
 <thead><tr><th>Stage</th><th>Status</th><th>Exit code</th><th>Seconds</th><th>Model ID</th><th>Resolved device</th><th>Workflow ID</th><th>Note</th><th>Error</th><th>Metrics</th></tr></thead>
 <tbody>{stage_rows}</tbody>
 </table>
-<h2>Reproducibility fingerprints</h2>\n<p><small>Python: {html.escape(str(reproducibility.get("python_version", "unknown")))} | Platform: {html.escape(str(reproducibility.get("platform", "unknown")))}</small></p>\n<table><thead><tr><th>Input</th><th>Path</th><th>SHA-256</th></tr></thead><tbody>{fingerprint_table}</tbody></table>\n<h2>Interpretation limits</h2>
+<h2>Reproducibility fingerprints</h2>
+<p><small>Python: {html.escape(str(reproducibility.get("python_version", "unknown")))} | Platform: {html.escape(str(reproducibility.get("platform", "unknown")))}</small></p>
+<table><thead><tr><th>Input</th><th>Path</th><th>SHA-256</th></tr></thead><tbody>{fingerprint_table}</tbody></table>
+<h2>Interpretation limits</h2>
 <p>Behavior Bench checks are configured regression signals, not a general semantic-quality guarantee. Safety Probe Lab marker matches are heuristic triage indicators, not a validated safety score. Experiment Scientist word deltas describe response length, not answer quality. A passing workflow is not a safety or correctness certification.</p>
 <p><small>Created: {html.escape(str(report.get("created_at_utc", "")))} | Completed: {html.escape(str(report.get("completed_at_utc", "")))}</small></p>
 </body>
