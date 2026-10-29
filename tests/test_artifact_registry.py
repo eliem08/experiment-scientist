@@ -153,3 +153,22 @@ def test_project_summaries_report_paired_experiment_delta_without_claiming_quali
     assert metrics["Paired prompts"] == 2
     assert metrics["Mean treatment-minus-baseline word delta"] == 0.5
     assert metrics["Bootstrap CI lower"] == -2.0
+
+
+def test_compare_metric_maps_adds_deltas_against_first_run_only_for_common_metrics():
+    from workbench_analytics import compare_metric_maps
+
+    rows = compare_metric_maps(
+        [{"pass_rate": 0.8, "latency": 100}, {"pass_rate": 0.9, "latency": 120, "extra": 1}],
+        ["baseline", "candidate"],
+    )
+    assert rows == [
+        {"metric": "latency", "baseline": 100, "candidate": 120, "delta vs baseline (candidate)": 20},
+        {"metric": "pass_rate", "baseline": 0.8, "candidate": 0.9, "delta vs baseline (candidate)": 0.09999999999999998},
+    ]
+
+
+def test_compare_metric_maps_requires_two_runs():
+    from workbench_analytics import compare_metric_maps
+
+    assert compare_metric_maps([{"x": 1}], ["only"]) == []
