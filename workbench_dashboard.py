@@ -93,6 +93,25 @@ labels = [f'{a["project"]} · {a["model_id"]} · {a["artifact_name"]} · {a["pat
 selected = st.selectbox("Artifact details", labels)
 artifact = visible[labels.index(selected)]
 st.json({key: artifact[key] for key in ("project", "model_id", "run_id", "created_at_utc", "schema_version", "manifest_status", "warnings")})
+if artifact["project"] == "neuronlab-unified-workflow":
+    workflow_payload = artifact["payload"]
+    gate = workflow_payload.get("quality_gate", {})
+    st.subheader("Unified workflow stages")
+    st.metric("Unified quality gate", "PASS" if gate.get("passed") is True else "FAIL")
+    stage_rows = []
+    for stage in workflow_payload.get("stages", []):
+        stage_rows.append({
+            "stage": stage.get("name"),
+            "status": stage.get("status"),
+            "exit_code": stage.get("exit_code"),
+            "duration_seconds": stage.get("duration_seconds"),
+            "artifact": stage.get("artifact"),
+            "error": stage.get("error", ""),
+        })
+    if stage_rows:
+        st.dataframe(pd.DataFrame(stage_rows), use_container_width=True, hide_index=True)
+    if gate.get("blockers"):
+        st.warning("Quality-gate blockers: " + ", ".join(str(item) for item in gate["blockers"]))
 with st.expander("Raw JSON artifact"):
     st.code(json.dumps(artifact["payload"], indent=2, ensure_ascii=False), language="json")
 
