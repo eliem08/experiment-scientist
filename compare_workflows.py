@@ -73,6 +73,8 @@ def compare_workflows(
             item["regression"] = None
             if old is not None or new is not None:
                 warnings.append(f"Cannot compare {stage_name}.{metric}: numeric metric missing from baseline or candidate.")
+            if stage_name == "behavior-bench" and metric in {"expected_pass_rate", "cases_with_forbidden_hits"}:
+                blockers.append(f"{metric}: required regression metric is missing or non-numeric; refusing to pass the comparison gate.")
         comparisons.append(item)
 
     baseline_id = baseline.get("workflow_id")
