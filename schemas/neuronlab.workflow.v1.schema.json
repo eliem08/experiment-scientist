@@ -42,6 +42,37 @@
       "type": "string",
       "enum": ["auto", "cpu", "cuda", "mps"]
     },
+    "reproducibility": {
+      "type": "object",
+      "required": ["python_version", "platform", "case_suite", "runner_scripts"],
+      "properties": {
+        "python_version": {"type": "string"},
+        "platform": {"type": "string"},
+        "case_suite": {
+          "type": "object",
+          "required": ["path", "size_bytes", "sha256"],
+          "properties": {
+            "path": {"type": "string"},
+            "size_bytes": {"type": "integer", "minimum": 0},
+            "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+          },
+          "additionalProperties": false
+        },
+        "runner_scripts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": {"type": "string"},
+              "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "config": {
       "type": "object",
       "required": ["max_new_tokens", "seed", "timeout_seconds", "minimum_failing_severity"],
