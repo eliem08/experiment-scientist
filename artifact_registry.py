@@ -12,7 +12,7 @@ from typing import Any
 CONTRACT_VERSION = "neuronlab.run.v1"
 KNOWN_RESULT_NAMES = {
     "results.json", "probe-results.json", "experiment.json",
-    "report.json", "steering_report.json", "flight_school.json", "workflow.json", "workflow-comparison.json",
+    "report.json", "steering.json", "steering_report.json", "flight_school.json", "workflow.json", "workflow-comparison.json",
 }
 
 
