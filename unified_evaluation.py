@@ -270,7 +270,7 @@ def run_workflow(
                 elif stage.get("manifest_workflow_id") != workflow_id:
                     stage["status"] = "failed"
                     stage["error"] = "Result manifest workflow_id does not match this invocation; refusing to mix stale or unlinked results."
-                elif stage.get("artifact_model_id") != model_id:
+                elif stage.get("artifact_model_id") is not None and stage.get("artifact_model_id") != model_id:
                     stage["status"] = "failed"
                     stage["error"] = "Result model ID does not match the requested workflow model."
                 elif completed.returncode != 0:
