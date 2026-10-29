@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/eliem08/experiment-scientist/blob/main/schemas/neuronlab.workflow.v1.schema.json",
+  "title": "NeuronLab Unified Workflow Report",
+  "description": "A reproducible orchestration record linking multiple NeuronLab evaluation runs.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "workflow_id",
+    "created_at_utc",
+    "completed_at_utc",
+    "model_id",
+    "device",
+    "config",
+    "status",
+    "quality_gate",
+    "stages",
+    "artifacts",
+    "report_path"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "neuronlab.workflow.v1"
+    },
+    "workflow_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "device": {
+      "type": "string",
+      "enum": ["auto", "cpu", "cuda", "mps"]
+    },
+    "config": {
+      "type": "object",
+      "required": ["max_new_tokens", "seed", "timeout_seconds", "minimum_failing_severity"],
+      "properties": {
+        "max_new_tokens": {"type": "integer", "minimum": 1},
+        "seed": {"type": "integer"},
+        "timeout_seconds": {"type": "integer", "minimum": 1},
+        "minimum_failing_severity": {
+          "oneOf": [
+            {"type": "string", "enum": ["low", "normal", "high", "critical"]},
+            {"type": "null"}
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "failed"]
+    },
+    "quality_gate": {
+      "type": "object",
+      "required": ["passed", "blockers"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "blockers": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "command", "artifact", "log"],
+        "properties": {
+          "name": {"type": "string"},
+          "status": {"type": "string", "enum": ["running", "completed", "failed"]},
+          "command": {"type": "array", "items": {"type": "string"}},
+          "artifact": {"type": "string"},
+          "log": {"type": "string"},
+          "exit_code": {"type": ["integer", "null"]},
+          "duration_seconds": {"type": "number", "minimum": 0},
+          "manifest_workflow_id": {"type": ["string", "null"]},
+          "artifact_model_id": {"type": ["string", "null"]},
+          "error": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "report_path": {"type": "string"}
+  },
+  "additionalProperties": true
+}
