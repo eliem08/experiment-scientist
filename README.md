@@ -90,3 +90,22 @@ Safety Probe Lab heuristic counts and Experiment Scientist response-length delta
 ### Real-model smoke run in GitHub Actions
 
 The workflow [`unified-smoke.yml`](.github/workflows/unified-smoke.yml) runs automatically on pull requests and can also be started manually; it runs all five executable stages against an actual Hugging Face model on CPU, validates that every stage completed, and uploads the JSON/HTML report plus logs as a workflow artifact. It checks out Steering Studio and Neural Flight School as well as the three core repositories. To run it manually, open the repository's **Actions** tab, select **unified-evaluation-smoke**, click **Run workflow**, and keep the default `sshleifer/tiny-gpt2` model for the smallest initial download. The regression/quality gate may legitimately fail on a tiny model; the smoke check distinguishes that from an evaluator execution failure. This manual run has to be triggered from GitHub and has not been claimed as completed until its artifact is available.
+
+
+## Pre-registered repeated-seed experiment matrix
+
+The original \`prompt_experiment.py\` remains a quick, fixed example. For a more rigorous study, define the hypothesis, primary outcome, scoring rules, and paired prompts in a JSON spec **before running inference**. The new matrix runner validates the spec, records its exact SHA-256, evaluates multiple models and seeds, preserves every paired observation, and reports case-level paired bootstrap intervals plus paired effect size.
+
+\`\`\`bash
+python experiment_matrix.py \\
+  --spec examples/uncertainty-ablation.spec.json \\
+  --model-id distilgpt2 \\
+  --model-id gpt2 \\
+  --seeds 17,29,43,71,101 \\
+  --device auto \\
+  --output outputs/uncertainty-ablation
+\`\`\`
+
+Use \`--sample\` to enable seeded sampling (defaults are greedy decoding). Results are written to \`matrix-results.json\` and \`matrix-observations.csv\`. Supported transparent outcome functions are \`word_count\`, \`character_count\`, \`contains\`, \`regex_match\`, and \`exact_match\`; the spec must declare which metric is primary. See [the experiment matrix guide](docs/EXPERIMENT_MATRIX.md) for the schema, interpretation, and limitations.
+
+**Scientific caution:** these deterministic metrics do not judge semantic correctness or safety. Repeated seeds do not compensate for too few or unrepresentative prompts. Bootstrap intervals are computed over case-level paired deltas after averaging seeds, avoiding the mistake of treating repeated runs of one prompt as independent prompts. The saved spec hash supports auditability, but does not independently prove when the spec was authored.
