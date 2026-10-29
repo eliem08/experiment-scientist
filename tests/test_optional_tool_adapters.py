@@ -90,6 +90,8 @@ def test_optional_adapters_run_and_link_artifacts(tmp_path):
     assert stages["neural-flight-school"]["manifest_workflow_id"] == report["workflow_id"]
     assert stages["neural-flight-school"]["artifact_model_id"] is None
     assert stages["steering-studio"]["metrics"]["layer"] == 1
+    specs_command = next(stage["command"] for stage in report["stages"] if stage["name"] == "steering-studio")
+    assert specs_command[specs_command.index("--layer") + 1] == "6"
     assert stages["neural-flight-school"]["metrics"]["layers"] == 1
     assert len(report["artifacts"]) == 5
 
