@@ -176,6 +176,9 @@ def run_workflow(
                 if stage.get("artifact_readable") is False:
                     stage["status"] = "failed"
                     stage["error"] = "Result artifact exists but is not valid JSON."
+                elif stage.get("manifest_workflow_id") != workflow_id:
+                    stage["status"] = "failed"
+                    stage["error"] = "Result manifest workflow_id does not match this invocation; refusing to mix stale or unlinked results."
         except subprocess.TimeoutExpired:
             stage["status"] = "failed"
             stage["error"] = f"Stage exceeded timeout of {timeout_seconds} seconds."
