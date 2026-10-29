@@ -28,6 +28,8 @@ def test_comparison_passes_when_configured_metrics_do_not_regress():
         max_pass_rate_drop=0.05,
     )
     assert result["gate"]["passed"] is True
+    assert result["comparison_id"]
+    assert result["comparison_id"] != result["candidate"]["workflow_id"]
     assert result["comparisons"][0]["delta"] == pytest.approx(-0.02)
 
 
