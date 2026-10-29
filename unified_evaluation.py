@@ -82,6 +82,7 @@ def _read_artifact_summary(path: Path) -> dict[str, Any]:
         "artifact_readable": isinstance(payload, dict),
         "run_id": manifest.get("run_id") if isinstance(manifest, dict) else None,
         "manifest_workflow_id": manifest.get("workflow_id") if isinstance(manifest, dict) else None,
+        "artifact_model_id": payload.get("model_id") or (manifest.get("model_id") if isinstance(manifest, dict) else None),
     }
     if isinstance(payload, dict):
         project = str(manifest.get("project", "")) if isinstance(manifest, dict) else ""
@@ -179,6 +180,9 @@ def run_workflow(
                 elif stage.get("manifest_workflow_id") != workflow_id:
                     stage["status"] = "failed"
                     stage["error"] = "Result manifest workflow_id does not match this invocation; refusing to mix stale or unlinked results."
+                elif stage.get("artifact_model_id") != model_id:
+                    stage["status"] = "failed"
+                    stage["error"] = "Result model ID does not match the requested workflow model."
         except subprocess.TimeoutExpired:
             stage["status"] = "failed"
             stage["error"] = f"Stage exceeded timeout of {timeout_seconds} seconds."
