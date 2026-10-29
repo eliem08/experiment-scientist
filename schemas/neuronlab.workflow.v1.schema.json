@@ -62,6 +62,18 @@
       "type": "string",
       "enum": ["completed", "failed"]
     },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "stages_total": {"type": "integer", "minimum": 0},
+        "stages_completed": {"type": "integer", "minimum": 0},
+        "stages_failed": {"type": "integer", "minimum": 0},
+        "behavior_bench": {"type": "object"},
+        "safety_probe_lab": {"type": "object"},
+        "experiment_scientist": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
     "quality_gate": {
       "type": "object",
       "required": ["passed", "blockers"],
