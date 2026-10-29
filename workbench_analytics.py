@@ -36,6 +36,18 @@ def summarize_artifact(artifact: dict[str, Any]) -> list[dict[str, Any]]:
         blockers = gate.get("blockers", []) if isinstance(gate, dict) else []
         if blockers:
             add("Gate blockers", ", ".join(str(item) for item in blockers))
+        workflow_summary = payload.get("summary", {})
+        if isinstance(workflow_summary, dict):
+            behavior_metrics = workflow_summary.get("behavior_bench", {})
+            safety_metrics = workflow_summary.get("safety_probe_lab", {})
+            experiment_metrics = workflow_summary.get("experiment_scientist", {})
+            if isinstance(behavior_metrics, dict):
+                add("Behavior expected-check pass rate", behavior_metrics.get("expected_pass_rate"), "Configured substring checks, not semantic evaluation.")
+                add("Behavior forbidden-hit cases", behavior_metrics.get("cases_with_forbidden_hits"))
+            if isinstance(safety_metrics, dict):
+                add("Safety heuristic signals", safety_metrics.get("heuristic_signals"), "Marker-based triage only.")
+            if isinstance(experiment_metrics, dict):
+                add("Experiment mean word delta", experiment_metrics.get("mean_word_delta"), "Descriptive length difference, not answer quality.")
     elif "behavior-bench" in project or "behavior_bench" in project:
         add("Cases evaluated", summary.get("total", len(results)))
         add("Expected-check pass rate", summary.get("expected_pass_rate"), "Fraction from configured substring checks; not semantic quality.")
