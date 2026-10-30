@@ -43,6 +43,7 @@ Each summary reports the mean paired delta, an exploratory percentile-bootstrap 
 | `contains` | Case-insensitive substring presence (0/1) | Exact phrasing may miss paraphrases |
 | `regex_match` | Whether the declared regular expression matches | Regex validity is not factual validity |
 | `exact_match` | Trimmed exact string equality (0/1) | Appropriate only for tightly specified tasks |
+| `json_field_equals` | Parses JSON and compares a declared dotted field path against a reference object (0/1) | Validates one field only; not the full response or its factual correctness |
 
 The supported metrics are intentionally simple and auditable. Add a separately validated judge or task-specific evaluator only when you can define its reliability and failure modes; do not relabel heuristic scores as semantic correctness or safety.
 
