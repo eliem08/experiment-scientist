@@ -44,3 +44,27 @@ def test_matrix_supports_structured_json_field_evaluator(tmp_path):
 def test_matrix_rejects_incomplete_json_field_metric(tmp_path, metric, message):
     with pytest.raises(ValueError, match=message):
         load_and_validate_spec(_spec(tmp_path, metric))
+
+
+def test_evaluator_provenance_is_stable_and_configuration_sensitive():
+    from experiment_matrix import evaluator_provenance
+
+    first = evaluator_provenance({"id": "contains-answer", "kind": "contains", "value": "42"})
+    same = evaluator_provenance({"value": "42", "kind": "contains", "id": "contains-answer"})
+    changed = evaluator_provenance({"id": "contains-answer", "kind": "contains", "value": "43"})
+    assert first == same
+    assert first["evaluator_id"] == "contains"
+    assert first["evaluator_version"] == "1.0.0"
+    assert len(first["configuration_sha256"]) == 64
+    assert first["configuration_sha256"] != changed["configuration_sha256"]
+
+
+def test_json_field_provenance_identifies_task_specific_evaluator():
+    from experiment_matrix import evaluator_provenance
+
+    result = evaluator_provenance({
+        "id": "answer", "kind": "json_field_equals",
+        "field_path": "result.answer", "reference": {"result": {"answer": 42}},
+    })
+    assert result["evaluator_id"] == "json-field-equals"
+    assert result["evaluator_kind"] == "task_specific"
