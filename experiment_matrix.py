@@ -62,6 +62,11 @@ def load_and_validate_spec(path: Path) -> tuple[dict[str, Any], str]:
             raise ValueError(f"Invalid direction for metric {metric_id}")
         if kind in {"contains", "exact_match"} and not isinstance(metric.get("value"), str):
             raise ValueError(f"Metric {metric_id} requires a string 'value'")
+        if kind == "json_field_equals":
+            if not isinstance(metric.get("field_path"), str) or not metric["field_path"].strip():
+                raise ValueError(f"Metric {metric_id} requires a non-empty string field_path")
+            if not isinstance(metric.get("reference"), dict):
+                raise ValueError(f"Metric {metric_id} requires an object reference")
         if kind == "regex_match":
             pattern = metric.get("pattern")
             if not isinstance(pattern, str):
