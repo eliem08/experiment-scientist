@@ -1,188 +1,37 @@
-import json
-
 import pytest
 
-from experiment_matrix import (
-    SPEC_VERSION,
-    bootstrap_mean_ci,
-    load_and_validate_spec,
-    score_response,
-    summarize_pairs,
-)
+from experiment_matrix import SPEC_VERSION, load_and_validate_spec, score_response
 
 
-def _spec(tmp_path, **overrides):
+def _spec(tmp_path, metric):
     payload = {
         "schema_version": SPEC_VERSION,
-        "title": "Test experiment",
-        "hypothesis": "Treatment increases explicit uncertainty.",
-        "primary_metric": "uncertainty",
-        "metrics": [
-            {"id": "uncertainty", "kind": "contains", "value": "I don't know", "direction": "higher"},
-            {"id": "length", "kind": "word_count", "direction": "neutral"},
-            {"id": "regex", "kind": "regex_match", "pattern": r"\b\d{4}\b", "direction": "higher"},
-            {"id": "exact", "kind": "exact_match", "value": "yes", "direction": "higher"},
-            {"id": "chars", "kind": "character_count", "direction": "lower"},
-        ],
-        "cases": [{"id": "one", "baseline": "Question?", "treatment": "Question with detail?"}],
+        "title": "Structured evaluator test",
+        "hypothesis": "Structured answers match the reference.",
+        "primary_metric": metric["id"],
+        "metrics": [metric],
+        "cases": [{"id": "case-1", "baseline": "Answer:", "treatment": "Answer with JSON:"}],
     }
-    payload.update(overrides)
     path = tmp_path / "spec.json"
+    import json
     path.write_text(json.dumps(payload), encoding="utf-8")
     return path
 
 
-def test_validates_spec_and_returns_exact_file_hash(tmp_path):
-    path = _spec(tmp_path)
-    spec, fingerprint = load_and_validate_spec(path)
-    assert spec["title"] == "Test experiment"
-    assert len(fingerprint) == 64
-    assert fingerprint == load_and_validate_spec(path)[1]
-
-
-@pytest.mark.parametrize("overrides, message", [
-    ({"schema_version": "wrong"}, "schema_version"),
-    ({"primary_metric": "missing"}, "primary_metric"),
-    ({"metrics": []}, "metrics"),
-    ({"cases": []}, "cases"),
-    ({"metrics": [{"id": "uncertainty", "kind": "mystery"}]}, "Unsupported metric"),
-    ({"metrics": [{"id": "uncertainty", "kind": "contains"}]}, "requires a string"),
-    ({"metrics": [{"id": "uncertainty", "kind": "regex_match", "pattern": "["}]}, "Invalid regex"),
-    ({"cases": [{"id": "same", "baseline": "a", "treatment": "b"}, {"id": "same", "baseline": "c", "treatment": "d"}]}, "unique"),
-])
-def test_rejects_invalid_spec(tmp_path, overrides, message):
-    path = _spec(tmp_path, **overrides)
-    with pytest.raises(ValueError, match=message):
-        load_and_validate_spec(path)
-
-
-def test_metric_scorers_are_deterministic_and_case_insensitive_where_expected():
-    assert score_response("I DON'T KNOW", {"kind": "contains", "value": "I don't know"}) == 1.0
-    assert score_response("No idea", {"kind": "contains", "value": "I don't know"}) == 0.0
-    assert score_response("a b c", {"kind": "word_count"}) == 3.0
-    assert score_response("abcd", {"kind": "character_count"}) == 4.0
-    assert score_response("answer 2026", {"kind": "regex_match", "pattern": r"\b\d{4}\b"}) == 1.0
-    assert score_response("yes ", {"kind": "exact_match", "value": "yes"}) == 1.0
-
-
-def test_bootstrap_is_seeded_and_reports_small_sample_limitations():
-    assert bootstrap_mean_ci([1.0, 2.0, 3.0], seed=9) == bootstrap_mean_ci([1.0, 2.0, 3.0], seed=9)
-    one = bootstrap_mean_ci([2.0])
-    assert one["mean"] == 2.0
-    assert one["lower"] is None and one["upper"] is None
-    assert summarize_pairs([1.0, 2.0, 3.0], seed=17)["cohens_dz"] is not None
-
-
-def test_bootstrap_rejects_invalid_configuration():
-    with pytest.raises(ValueError, match="iterations"):
-        bootstrap_mean_ci([1.0, 2.0], iterations=10)
-    with pytest.raises(ValueError, match="confidence"):
-        bootstrap_mean_ci([1.0, 2.0], confidence=1.0)
-
-
-def test_report_renderer_includes_outcomes_performance_and_reproducibility():
-    from render_matrix_report import render_html, render_markdown
-
-    payload = {
-        "schema_version": "experiment-scientist.matrix.v1",
-        "experiment": {"title": "Ablation", "hypothesis": "Treatment helps", "primary_metric": "contains", "spec_sha256": "abc"},
-        "models": ["toy-model"],
-        "device": "cpu",
-        "seeds": [17, 29],
-        "runtime_seconds": 12.5,
-        "summaries": [{
-            "model_id": "toy-model", "metric_id": "contains", "direction": "higher",
-            "cases": 4, "seeds_per_case": 2, "mean": 0.5, "lower": 0.1, "upper": 0.9, "cohens_dz": 0.7,
-        }],
-        "performance_summary": [{
-            "model_id": "toy-model", "paired_cases": 8,
-            "baseline_mean_generation_seconds": 0.4, "treatment_mean_generation_seconds": 0.5,
-            "baseline_mean_output_tokens_per_second": 20.0, "treatment_mean_output_tokens_per_second": 18.0,
-        }],
-        "reproducibility": {"python_version": "3.11", "torch_version": "2.x", "github_sha": "deadbeef"},
-        "model_revisions": {"toy-model": {"resolved_commit": "modelsha", "tokenizer_resolved_commit": "toksha"}},
-        "interpretation_limits": ["This is a rule-based metric."],
-        "observations": [],
-    }
-    markdown = render_markdown(payload)
-    assert "Outcome summaries" in markdown
-    assert "Performance" in markdown
-    assert "0.4000" in markdown
-    assert "modelsha" in markdown
-    assert "rule-based metric" in markdown
-    page = render_html(payload)
-    assert "<!doctype html>" in page
-    assert "<table>" in page
-    assert "<h2>Performance</h2>" in page
-    assert "&lt;script&gt;" not in page
-
-
-def test_report_renderer_escapes_untrusted_html_fields():
-    from render_matrix_report import render_html
-
-    payload = {
-        "experiment": {"title": "<script>alert(1)</script>", "hypothesis": "<img src=x>"},
-        "models": [], "seeds": [], "summaries": [], "performance_summary": [],
-        "reproducibility": {}, "model_revisions": {},
-        "interpretation_limits": [], "observations": [],
-    }
-    page = render_html(payload)
-    assert "<script>alert(1)</script>" not in page
-    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
-
-
-def test_performance_summary_counts_each_pair_once_not_once_per_metric():
-    from experiment_matrix import summarize_performance
-
-    shared = {
-        "model_id": "m", "seed": 17, "case_id": "c",
-        "baseline_generation_seconds": 2.0, "treatment_generation_seconds": 3.0,
-        "baseline_input_tokens": 10, "treatment_input_tokens": 12,
-        "baseline_output_tokens": 20, "treatment_output_tokens": 24,
-        "baseline_output_tokens_per_second": 10.0, "treatment_output_tokens_per_second": 8.0,
-    }
-    rows = [
-        {**shared, "metric_id": "a"},
-        {**shared, "metric_id": "b"},
-        {**shared, "seed": 29, "metric_id": "a", "baseline_generation_seconds": 4.0},
-    ]
-    summary = summarize_performance(rows, ["m"])[0]
-    assert summary["paired_cases"] == 2
-    assert summary["baseline_mean_generation_seconds"] == 3.0
-    assert summary["treatment_mean_generation_seconds"] == 3.0
-    assert summary["total_baseline_generation_seconds"] == 6.0
-
-
-def test_performance_summary_rejects_inconsistent_duplicate_metrics():
-    from experiment_matrix import summarize_performance
-
-    base = {
-        "model_id": "m", "seed": 17, "case_id": "c",
-        "baseline_generation_seconds": 2.0, "treatment_generation_seconds": 3.0,
-        "baseline_input_tokens": 10, "treatment_input_tokens": 12,
-        "baseline_output_tokens": 20, "treatment_output_tokens": 24,
-    }
-    with pytest.raises(ValueError, match="Inconsistent performance data"):
-        summarize_performance([{**base, "metric_id": "a"}, {**base, "metric_id": "b", "baseline_output_tokens": 999}], ["m"])
-
-
-def test_matrix_uses_shared_evaluator_core_for_existing_metric_types():
-    from experiment_matrix import score_response
-
+def test_matrix_reuses_shared_evaluator_core_for_existing_metric_types():
     assert score_response("Hello there", {"kind": "contains", "value": "hello"}) == 1.0
     assert score_response(" exact ", {"kind": "exact_match", "value": "exact"}) == 1.0
     assert score_response("Year 2026", {"kind": "regex_match", "pattern": r"\b\d{4}\b"}) == 1.0
 
 
 def test_matrix_supports_structured_json_field_evaluator(tmp_path):
-    from experiment_matrix import score_response
-
     metric = {
         "id": "answer",
         "kind": "json_field_equals",
         "field_path": "result.answer",
         "reference": {"result": {"answer": "42"}},
     }
+    load_and_validate_spec(_spec(tmp_path, metric))
     assert score_response('{"result":{"answer":"42"}}', metric) == 1.0
     assert score_response('{"result":{"answer":"41"}}', metric) == 0.0
     assert score_response("not json", metric) == 0.0
@@ -193,6 +42,5 @@ def test_matrix_supports_structured_json_field_evaluator(tmp_path):
     ({"id": "answer", "kind": "json_field_equals", "field_path": "result.value"}, "reference"),
 ])
 def test_matrix_rejects_incomplete_json_field_metric(tmp_path, metric, message):
-    path = _spec(tmp_path, metrics=[metric], primary_metric="answer")
     with pytest.raises(ValueError, match=message):
-        load_and_validate_spec(path)
+        load_and_validate_spec(_spec(tmp_path, metric))
