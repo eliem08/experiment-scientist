@@ -95,6 +95,25 @@ def load_and_validate_spec(path: Path) -> tuple[dict[str, Any], str]:
     return spec, sha256_file(path)
 
 
+def evaluator_provenance(metric: dict[str, Any]) -> dict[str, str]:
+    """Return a stable evaluator identity and hash of its complete declaration."""
+    kinds = {
+        "word_count": ("word-count", "1.0.0"),
+        "character_count": ("character-count", "1.0.0"),
+        "contains": ("contains", "1.0.0"),
+        "exact_match": ("exact-match", "1.0.0"),
+        "regex_match": ("regex-match", "1.0.0"),
+        "json_field_equals": ("json-field-equals", "1.0.0"),
+    }
+    evaluator_id, version = kinds[metric["kind"]]
+    canonical = json.dumps(metric, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    return {
+        "evaluator_id": evaluator_id,
+        "evaluator_version": version,
+        "evaluator_kind": "rule_based" if metric["kind"] not in {"json_field_equals"} else "task_specific",
+        "configuration_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+    }
+
 def score_response(response: str, metric: dict[str, Any]) -> float:
     """Score a response with a declared deterministic metric."""
     kind = metric["kind"]
@@ -262,9 +281,11 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
                 for metric in metrics:
                     base_score = score_response(arms["baseline"]["response"], metric)
                     treatment_score = score_response(arms["treatment"]["response"], metric)
+                    evaluator_info = evaluator_provenance(metric)
                     observations.append({
                         "model_id": model_id, "seed": seed, "case_id": case["id"],
                         "metric_id": metric["id"], "metric_kind": metric["kind"],
+                        **evaluator_info,
                         "baseline_score": base_score, "treatment_score": treatment_score,
                         "delta_treatment_minus_baseline": treatment_score - base_score,
                         "baseline_response_sha256": arms["baseline"]["response_sha256"],
@@ -294,6 +315,7 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
             summary = summarize_pairs(case_deltas, seed=(seeds[0] + len(metric["id"])))
             summaries.append({
                 "model_id": model_id, "metric_id": metric["id"], "metric_kind": metric["kind"],
+                **evaluator_provenance(metric),
                 "direction": metric.get("direction", "higher"),
                 "cases": len(case_deltas), "seeds_per_case": len(seeds),
                 "observations": len(rows), **summary,
