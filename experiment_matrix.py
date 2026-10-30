@@ -345,7 +345,7 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
     json_path = output / "matrix-results.json"
     json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
     csv_path = output / "matrix-observations.csv"
-    fields = ["model_id", "seed", "case_id", "metric_id", "metric_kind", "baseline_score",
+    fields = ["model_id", "seed", "case_id", "metric_id", "metric_kind", "evaluator_id", "evaluator_version", "evaluator_kind", "configuration_sha256", "baseline_score",
               "treatment_score", "delta_treatment_minus_baseline", "baseline_response_sha256",
               "treatment_response_sha256", "baseline_input_tokens", "treatment_input_tokens",
               "baseline_output_tokens", "treatment_output_tokens", "baseline_generation_seconds",
