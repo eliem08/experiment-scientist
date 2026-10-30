@@ -31,6 +31,7 @@ Use `--sample` for seeded sampling. Greedy decoding is the default. Each case is
 
 - `matrix-results.json`: spec fingerprint, hypothesis, primary metric, model IDs, seed set, generation settings, summaries, all observations, and interpretation limits.
 - `matrix-observations.csv`: one row per model × seed × case × metric, including scores, deltas, response hashes, and responses.
+- Each metric summary and observation records `evaluator_id`, `evaluator_version`, `evaluator_kind`, and `configuration_sha256`. The configuration fingerprint hashes the complete metric declaration (including its direction and scoring parameters), using canonical JSON serialization.
 
 Each summary reports the mean paired delta, an exploratory percentile-bootstrap interval, standard deviation of case-level deltas, and paired Cohen's \(d_z\) when estimable. Positive deltas favor treatment only for metrics whose direction is `higher`; negative deltas favor treatment for `lower`. A `neutral` metric is diagnostic.
 
