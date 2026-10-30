@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 SPEC_VERSION = "experiment-scientist.spec.v1"
-SUPPORTED_METRICS = {"word_count", "character_count", "contains", "regex_match", "exact_match"}
+SUPPORTED_METRICS = {"word_count", "character_count", "contains", "regex_match", "exact_match", "json_field_equals"}
 
 
 def sha256_file(path: Path) -> str:
@@ -91,21 +91,31 @@ def load_and_validate_spec(path: Path) -> tuple[dict[str, Any], str]:
 
 
 def score_response(response: str, metric: dict[str, Any]) -> float:
-    """Score a response with a declared, deterministic metric."""
+    """Score a response with a declared deterministic metric."""
     kind = metric["kind"]
     if kind == "word_count":
         return float(len(response.split()))
     if kind == "character_count":
         return float(len(response))
+    from evaluation_core import ContainsEvaluator, EvaluationInput, ExactMatchEvaluator, JSONFieldEqualsEvaluator, RegexMatchEvaluator
     if kind == "contains":
-        return float(metric["value"].casefold() in response.casefold())
-    if kind == "exact_match":
-        return float(response.strip() == metric["value"])
-    if kind == "regex_match":
-        import re
-        return float(re.search(metric["pattern"], response, flags=re.MULTILINE) is not None)
-    raise ValueError(f"Unsupported metric kind: {kind}")
-
+        evaluator = ContainsEvaluator(metric["value"])
+        item = EvaluationInput(case_id="matrix-case", response=response)
+    elif kind == "exact_match":
+        evaluator = ExactMatchEvaluator()
+        item = EvaluationInput(case_id="matrix-case", response=response, reference=metric["value"])
+    elif kind == "regex_match":
+        evaluator = RegexMatchEvaluator(metric["pattern"])
+        item = EvaluationInput(case_id="matrix-case", response=response)
+    elif kind == "json_field_equals":
+        evaluator = JSONFieldEqualsEvaluator(metric["field_path"])
+        item = EvaluationInput(case_id="matrix-case", response=response, reference=metric["reference"])
+    else:
+        raise ValueError(f"Unsupported metric kind: {kind}")
+    result = evaluator.evaluate(item)
+    if result.status != "completed" or result.score is None:
+        raise ValueError(f"Evaluator {result.evaluator_id} did not return a score")
+    return result.score
 
 def bootstrap_mean_ci(values: list[float], *, iterations: int = 4000, seed: int = 17,
                       confidence: float = 0.95) -> dict[str, Any]:
