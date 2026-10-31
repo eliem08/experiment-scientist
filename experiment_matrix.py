@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 SPEC_VERSION = "experiment-scientist.spec.v1"
-SUPPORTED_METRICS = {"word_count", "character_count", "contains", "regex_match", "exact_match"}
+SUPPORTED_METRICS = {"word_count", "character_count", "contains", "regex_match", "exact_match", "json_field_equals"}
 
 
 def sha256_file(path: Path) -> str:
@@ -62,6 +62,11 @@ def load_and_validate_spec(path: Path) -> tuple[dict[str, Any], str]:
             raise ValueError(f"Invalid direction for metric {metric_id}")
         if kind in {"contains", "exact_match"} and not isinstance(metric.get("value"), str):
             raise ValueError(f"Metric {metric_id} requires a string 'value'")
+        if kind == "json_field_equals":
+            if not isinstance(metric.get("field_path"), str) or not metric["field_path"].strip():
+                raise ValueError(f"Metric {metric_id} requires a non-empty string field_path")
+            if not isinstance(metric.get("reference"), dict):
+                raise ValueError(f"Metric {metric_id} requires an object reference")
         if kind == "regex_match":
             pattern = metric.get("pattern")
             if not isinstance(pattern, str):
@@ -90,22 +95,51 @@ def load_and_validate_spec(path: Path) -> tuple[dict[str, Any], str]:
     return spec, sha256_file(path)
 
 
+def evaluator_provenance(metric: dict[str, Any]) -> dict[str, str]:
+    """Return a stable evaluator identity and hash of its complete declaration."""
+    kinds = {
+        "word_count": ("word-count", "1.0.0"),
+        "character_count": ("character-count", "1.0.0"),
+        "contains": ("contains", "1.0.0"),
+        "exact_match": ("exact-match", "1.0.0"),
+        "regex_match": ("regex-match", "1.0.0"),
+        "json_field_equals": ("json-field-equals", "1.0.0"),
+    }
+    evaluator_id, version = kinds[metric["kind"]]
+    canonical = json.dumps(metric, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    return {
+        "evaluator_id": evaluator_id,
+        "evaluator_version": version,
+        "evaluator_kind": "rule_based" if metric["kind"] not in {"json_field_equals"} else "task_specific",
+        "configuration_sha256": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+    }
+
 def score_response(response: str, metric: dict[str, Any]) -> float:
-    """Score a response with a declared, deterministic metric."""
+    """Score a response with a declared deterministic metric."""
     kind = metric["kind"]
     if kind == "word_count":
         return float(len(response.split()))
     if kind == "character_count":
         return float(len(response))
+    from evaluation_core import ContainsEvaluator, EvaluationInput, ExactMatchEvaluator, JSONFieldEqualsEvaluator, RegexMatchEvaluator
     if kind == "contains":
-        return float(metric["value"].casefold() in response.casefold())
-    if kind == "exact_match":
-        return float(response.strip() == metric["value"])
-    if kind == "regex_match":
-        import re
-        return float(re.search(metric["pattern"], response, flags=re.MULTILINE) is not None)
-    raise ValueError(f"Unsupported metric kind: {kind}")
-
+        evaluator = ContainsEvaluator(metric["value"])
+        item = EvaluationInput(case_id="matrix-case", response=response)
+    elif kind == "exact_match":
+        evaluator = ExactMatchEvaluator()
+        item = EvaluationInput(case_id="matrix-case", response=response, reference=metric["value"])
+    elif kind == "regex_match":
+        evaluator = RegexMatchEvaluator(metric["pattern"])
+        item = EvaluationInput(case_id="matrix-case", response=response)
+    elif kind == "json_field_equals":
+        evaluator = JSONFieldEqualsEvaluator(metric["field_path"])
+        item = EvaluationInput(case_id="matrix-case", response=response, reference=metric["reference"])
+    else:
+        raise ValueError(f"Unsupported metric kind: {kind}")
+    result = evaluator.evaluate(item)
+    if result.status != "completed" or result.score is None:
+        raise ValueError(f"Evaluator {result.evaluator_id} did not return a score")
+    return result.score
 
 def bootstrap_mean_ci(values: list[float], *, iterations: int = 4000, seed: int = 17,
                       confidence: float = 0.95) -> dict[str, Any]:
@@ -247,9 +281,11 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
                 for metric in metrics:
                     base_score = score_response(arms["baseline"]["response"], metric)
                     treatment_score = score_response(arms["treatment"]["response"], metric)
+                    evaluator_info = evaluator_provenance(metric)
                     observations.append({
                         "model_id": model_id, "seed": seed, "case_id": case["id"],
                         "metric_id": metric["id"], "metric_kind": metric["kind"],
+                        **evaluator_info,
                         "baseline_score": base_score, "treatment_score": treatment_score,
                         "delta_treatment_minus_baseline": treatment_score - base_score,
                         "baseline_response_sha256": arms["baseline"]["response_sha256"],
@@ -279,6 +315,7 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
             summary = summarize_pairs(case_deltas, seed=(seeds[0] + len(metric["id"])))
             summaries.append({
                 "model_id": model_id, "metric_id": metric["id"], "metric_kind": metric["kind"],
+                **evaluator_provenance(metric),
                 "direction": metric.get("direction", "higher"),
                 "cases": len(case_deltas), "seeds_per_case": len(seeds),
                 "observations": len(rows), **summary,
@@ -308,7 +345,7 @@ def run_matrix(spec_path: Path, *, model_ids: list[str], output: Path, device: s
     json_path = output / "matrix-results.json"
     json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
     csv_path = output / "matrix-observations.csv"
-    fields = ["model_id", "seed", "case_id", "metric_id", "metric_kind", "baseline_score",
+    fields = ["model_id", "seed", "case_id", "metric_id", "metric_kind", "evaluator_id", "evaluator_version", "evaluator_kind", "configuration_sha256", "baseline_score",
               "treatment_score", "delta_treatment_minus_baseline", "baseline_response_sha256",
               "treatment_response_sha256", "baseline_input_tokens", "treatment_input_tokens",
               "baseline_output_tokens", "treatment_output_tokens", "baseline_generation_seconds",

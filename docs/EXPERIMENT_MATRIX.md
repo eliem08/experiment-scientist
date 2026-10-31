@@ -31,6 +31,7 @@ Use `--sample` for seeded sampling. Greedy decoding is the default. Each case is
 
 - `matrix-results.json`: spec fingerprint, hypothesis, primary metric, model IDs, seed set, generation settings, summaries, all observations, and interpretation limits.
 - `matrix-observations.csv`: one row per model × seed × case × metric, including scores, deltas, response hashes, and responses.
+- Each metric summary and observation records `evaluator_id`, `evaluator_version`, `evaluator_kind`, and `configuration_sha256`. The configuration fingerprint hashes the complete metric declaration (including its direction and scoring parameters), using canonical JSON serialization.
 
 Each summary reports the mean paired delta, an exploratory percentile-bootstrap interval, standard deviation of case-level deltas, and paired Cohen's \(d_z\) when estimable. Positive deltas favor treatment only for metrics whose direction is `higher`; negative deltas favor treatment for `lower`. A `neutral` metric is diagnostic.
 
@@ -43,6 +44,7 @@ Each summary reports the mean paired delta, an exploratory percentile-bootstrap 
 | `contains` | Case-insensitive substring presence (0/1) | Exact phrasing may miss paraphrases |
 | `regex_match` | Whether the declared regular expression matches | Regex validity is not factual validity |
 | `exact_match` | Trimmed exact string equality (0/1) | Appropriate only for tightly specified tasks |
+| `json_field_equals` | Parses JSON and compares a declared dotted field path against a reference object (0/1) | Validates one field only; not the full response or its factual correctness |
 
 The supported metrics are intentionally simple and auditable. Add a separately validated judge or task-specific evaluator only when you can define its reliability and failure modes; do not relabel heuristic scores as semantic correctness or safety.
 
